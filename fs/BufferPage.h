@@ -17,7 +17,7 @@ struct BufferPage {
     std::size_t file_id;
     std::size_t page_id;
     bool dirty;
-    unsigned int *data;
+    u_char *data;
 
 private:
     friend class BufferManager;

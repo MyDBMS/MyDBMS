@@ -14,10 +14,10 @@ void test_write() {
     File *file_1 = fs.open_file(FILENAME_1);
     for (int page_id = 0; page_id < PAGE_MAX; ++page_id) {
         BufferPage *page_0 = file_0->get_page(page_id);
-        page_0->data[0] = page_id;
+        page_0->data[0] = (u_char) page_id;
         page_0->dirty = true;
         BufferPage *page_1 = file_1->get_page(page_id);
-        page_1->data[PAGE_SIZE / 4 - 1] = PAGE_MAX - page_id;
+        page_1->data[PAGE_SIZE - 1] = (u_char) (PAGE_MAX - page_id);
         page_1->dirty = true;
     }
 }
@@ -28,9 +28,9 @@ void test_read() {
     File *file_1 = fs.open_file(FILENAME_1);
     for (int page_id = 0; page_id < PAGE_MAX; ++page_id) {
         BufferPage *page_0 = file_0->get_page(page_id);
-        assert(page_0->data[0] == page_id);
+        assert(page_0->data[0] == (u_char) page_id);
         BufferPage *page_1 = file_1->get_page(page_id);
-        assert(page_1->data[PAGE_SIZE / 4 - 1] == PAGE_MAX - page_id);
+        assert(page_1->data[PAGE_SIZE - 1] == (u_char) (PAGE_MAX - page_id));
     }
     Filesystem::remove_file(FILENAME_0);
     Filesystem::remove_file(FILENAME_1);
