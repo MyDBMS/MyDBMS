@@ -2,10 +2,15 @@
 #include "../rs/RecordSystem.h"
 
 #define FILENAME_0 ("bin/rs-test-0.txt")
+#define FILENAME_1 ("bin/rs-test-1.txt")
+
 #define TEST_FIXED_SIZE 11
 #define TEST_FULL_SIZE 19
 #define TEST_FULL_SIZE_LONG 21
+#define TEST_FULL_SIZE_EXTRA_LONG 41
 #define TEST_VAR_CNT 1
+
+#define COMPLEX_TEST_SCALE 1000000
 
 void meta_check() {
     assert(sizeof(RecordFileMeta) <= PAGE_SIZE);
@@ -73,6 +78,14 @@ void simple_test() {
         assert(size_out == TEST_FULL_SIZE_LONG);
         assert(memcmp(record_update_long, record_out_long, TEST_FULL_SIZE_LONG) == 0);
 
+        // 删除最后一条记录
+        file->delete_record(rid);
+
+        // 测试重新插入的正确性
+        rid = file->insert_record(TEST_FULL_SIZE_LONG, record_update_long);
+        assert(rid.page_id == 2);
+        assert(rid.slot_id == 3);
+
         // 关闭文件
         file->close();
     }
@@ -129,7 +142,90 @@ void simple_test() {
 }
 
 void complex_test() {
+    RecordSystem rs = RecordSystem();
+    rs.create_file(FILENAME_1, TEST_FIXED_SIZE, TEST_VAR_CNT);
+    auto file = rs.open_file(FILENAME_1);
+    char data_in[TEST_FULL_SIZE + 5] = {
+            0, 'A', 'B', 'C', 'D', 0, 0, 0, 0, 19, 0, 'D', 'a', 't', 'a', 'b', 'a', 's', 'e',
+    };
+    char data_in_long[TEST_FULL_SIZE_LONG + 5] = {
+            0, 'A', 'B', 'C', 'D', 0, 0, 0, 0, 21, 0, 'T', 's', 'i', 'n', 'g', 'h', 'u', 'a', 'D', 'B',
+    };
+    char data_in_extra_long[TEST_FULL_SIZE_EXTRA_LONG + 5] = {
+            0, 'A', 'B', 'C', 'D', 0, 0, 0, 0, 41, 0, 'T', 's', 'i', 'n', 'g', 'h', 'u', 'a', 'D', 'B', 'e', 'x', 't',
+    };
+    char data_out[TEST_FULL_SIZE + 5];
 
+    // 大规模插入测试
+    std::vector<RID> rid_list;
+    for (u_int32_t i = 0; i < COMPLEX_TEST_SCALE; ++i) {
+        *((u_int32_t *) (data_in + 5)) = i;
+        rid_list.push_back(file->insert_record(TEST_FULL_SIZE, data_in));
+    }
+
+    // 大规模读取测试
+    for (u_int32_t i = 0; i < COMPLEX_TEST_SCALE; ++i) {
+        std::size_t size_out = file->get_record(rid_list[i], data_out);
+        assert(size_out == TEST_FULL_SIZE);
+        assert(*((u_int32_t *) (data_out + 5)) == i);
+    }
+
+    // 大规模删除测试
+    for (u_int32_t i = 0; i < COMPLEX_TEST_SCALE; i += 2) {
+        file->delete_record(rid_list[i]);
+    }
+
+    // 重新插入测试，应当利用靠前的空闲空间
+    // 目前的空闲空间分级策略有缺陷，无法通过这一测试
+    // *((u_int32_t *) (data_in + 5)) = 0;
+    // RID rid = file->insert_record(TEST_FULL_SIZE, data_in);
+    // assert(rid.page_id == 2);
+    // assert(rid.slot_id == 0);
+
+    // 大规模更新测试
+    std::vector<RID> rid_list_new;
+    for (u_int32_t i = 1; i < COMPLEX_TEST_SCALE; i += 2) {
+        if (rid_list[i].slot_id < 100) {
+            RID rid_new = file->update_record(rid_list[i], TEST_FULL_SIZE_LONG, data_in_long);
+            // 由于偶数项记录已全部删除，此处应为就地更新
+            assert(rid_new.page_id == rid_list[i].page_id);
+            assert(rid_new.slot_id == rid_list[i].slot_id);
+            rid_list_new.push_back(rid_new);
+        } else if (rid_list[i].slot_id < 200) {
+            RID rid_new = file->update_record(rid_list[i], TEST_FULL_SIZE_EXTRA_LONG, data_in_extra_long);
+            // 此处不应为就地更新
+            assert(rid_new.page_id != rid_list[i].page_id || rid_new.slot_id != rid_list[i].slot_id);
+            rid_list_new.push_back(rid_new);
+        }
+    }
+
+    // 删光某一页后插入
+    for (const auto &r: rid_list) {
+        if (r.page_id == 2) {
+            file->delete_record(r);
+        }
+    }
+    for (const auto &r: rid_list_new) {
+        if (r.page_id == 2) {
+            file->delete_record(r);
+        }
+    }
+    {
+        RID r = file->insert_record(TEST_FULL_SIZE_EXTRA_LONG, data_in_extra_long);
+        assert(r.page_id == 2);
+        assert(r.slot_id == 0);
+    }
+
+    // 最终文件的页数应当在合理的范围内
+    for (const auto &r: rid_list) {
+        assert(r.page_id < 8000);
+    }
+    for (const auto &r: rid_list_new) {
+        assert(r.page_id < 8000);
+    }
+
+    file->close();
+    Filesystem::remove_file(FILENAME_1);
 }
 
 int main() {

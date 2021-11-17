@@ -56,9 +56,8 @@ class RecordFile {
     /**
      * 用于在插入或删除记录后，维护页头以及文件元信息页的空闲空间相关信息。
      * @param page     数据页
-     * @param page_id  页编号
      */
-    void fix_page_header(BufferPage *page, std::size_t page_id);
+    void fix_page_header(BufferPage *page);
 
 public:
 

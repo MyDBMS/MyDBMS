@@ -26,8 +26,17 @@ RID RecordFile::alloc_vacancy(std::size_t record_size) {
             std::size_t page_id = 2 + fsp_id * (PAGE_SIZE / 2 + 1) + (cursor - PAGE_SIZE / 2);
             auto page = file->get_page(page_id);
             auto header = (RecordPageHeader *) page->data;
-            if (header->free_slot_id >= header->slot_cnt) {
-                header->slot_cnt = header->free_slot_id + 1;
+            if (fsp->data[cursor] == 0xFF) {
+                // 表示这是一个新页
+                header->slot_cnt = 1;
+                header->free_size = PAGE_SIZE - RECORD_PAGE_HEADER_SIZE - 2;
+                header->free_offset = RECORD_PAGE_HEADER_SIZE;
+                header->free_slot_id = 0;
+            } else {
+                assert(header->free_size >> (PAGE_SIZE_IDX - VAC_LEVEL_IDX) == fsp->data[cursor]);
+                if (header->free_slot_id >= header->slot_cnt) {
+                    header->slot_cnt = header->free_slot_id + 1;
+                }
             }
             get_slot_offset(page, header->free_slot_id) = header->free_offset;
             page->dirty = true;
@@ -71,25 +80,31 @@ std::pair<std::size_t, u_int16_t> RecordFile::vacancy_at(BufferPage *page, std::
     } else if (slot_id == header->slot_cnt) {
         // 找到最后一条记录的末尾，计算剩余部分长度
         u_int16_t last_slot_offset = get_slot_offset(page, slot_id - 1);
-        assert(last_slot_offset != 0);
+        assert(last_slot_offset >= RECORD_PAGE_HEADER_SIZE);
         u_int16_t last_record_size = *((u_int16_t *) (page->data + last_slot_offset + meta.fixed_size - 2));
         u_int16_t slot_offset = last_slot_offset + last_record_size;
+        assert(slot_offset >= RECORD_PAGE_HEADER_SIZE);
         return std::make_pair(PAGE_SIZE - slot_offset - header->slot_cnt * 2 - 2, slot_offset);
     } else {
         // 尝试获取当前记录的字符偏移
         u_int16_t slot_offset = get_slot_offset(page, slot_id);
         if (slot_offset == 0) {
             // 说明当前记录本身无效，从前一条记录的偏移量入手
-            slot_offset = get_slot_offset(page, slot_id - 1);
-            if (slot_offset == 0) {
-                // 说明前一条记录也无效，根据语义，应当返回 0
-                return std::make_pair(0, 0);
+            if (slot_id > 0) {
+                slot_offset = get_slot_offset(page, slot_id - 1);
+                if (slot_offset == 0) {
+                    // 说明前一条记录也无效，根据语义，应当返回 0
+                    return std::make_pair(0, 0);
+                }
+                // 前一条记录有效，根据语义，需要将 slot_offset 调整为前一条记录的末尾地址
+                u_int16_t last_record_size = *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
+                slot_offset += last_record_size;
+            } else {
+                // 当前记录已经在最开始
+                slot_offset = RECORD_PAGE_HEADER_SIZE;
             }
-            // 前一条记录有效，根据语义，需要将 slot_offset 调整为前一条记录的末尾地址
-            u_int16_t last_record_size = *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
-            slot_offset += last_record_size;
         }
-        assert(slot_offset != 0);
+        assert(slot_offset >= RECORD_PAGE_HEADER_SIZE);
         u_int16_t next_slot_offset;
         std::size_t next = slot_id + 1;
         while (next < header->slot_cnt && (next_slot_offset = get_slot_offset(page, next)) == 0) {
@@ -103,11 +118,12 @@ std::pair<std::size_t, u_int16_t> RecordFile::vacancy_at(BufferPage *page, std::
     }
 }
 
-void RecordFile::fix_page_header(BufferPage *page, std::size_t page_id) {
+void RecordFile::fix_page_header(BufferPage *page) {
     auto header = (RecordPageHeader *) page->data;
     header->free_size = 0;
     // 找到最大空闲空间
-    for (int i = 0; i <= header->slot_cnt; ++i) {
+    // 遍历式查找，效率较低
+    for (std::size_t i = 0; i <= header->slot_cnt; ++i) {
         if (i == header->slot_cnt || get_slot_offset(page, i) == 0) {
             std::pair<std::size_t, u_int16_t> vacancy_info;
             if (std::get<0>((vacancy_info = vacancy_at(page, i))) > header->free_size) {
@@ -119,9 +135,10 @@ void RecordFile::fix_page_header(BufferPage *page, std::size_t page_id) {
     }
 
     // 更新 fsp
+    // 当前分级策略可能导致一定的空间浪费
     u_char free_space_level = header->free_size >> (PAGE_SIZE_IDX - VAC_LEVEL_IDX);
-    std::size_t fsp_id = (page_id - 2) / (PAGE_SIZE / 2 + 1);
-    std::size_t page_id_in_group = (page_id - 2) % (PAGE_SIZE / 2 + 1);
+    std::size_t fsp_id = (page->page_id - 2) / (PAGE_SIZE / 2 + 1);
+    std::size_t page_id_in_group = (page->page_id - 2) % (PAGE_SIZE / 2 + 1);
     assert(page_id_in_group < PAGE_SIZE / 2);
     auto fsp = file->get_page(fsp_id * (PAGE_SIZE / 2 + 1) + 1);
     auto cursor = page_id_in_group + PAGE_SIZE / 2;
@@ -173,9 +190,10 @@ RID RecordFile::insert_record(std::size_t record_size, const char *record) {
     page->dirty = true;
     u_int16_t slot_offset = get_slot_offset(page, rid.slot_id);
     memcpy(page->data + slot_offset, record, record_size);
+    assert(*((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2)) == record_size);
 
     // 维护页头部空闲空间信息
-    fix_page_header(page, rid.page_id);
+    fix_page_header(page);
     return rid;
 }
 
@@ -192,7 +210,7 @@ void RecordFile::delete_record(const RID &rid) {
     }
 
     // 维护页头部空闲空间信息
-    fix_page_header(page, rid.page_id);
+    fix_page_header(page);
 }
 
 RID RecordFile::update_record(const RID &rid, std::size_t record_size, const char *record) {
@@ -202,6 +220,7 @@ RID RecordFile::update_record(const RID &rid, std::size_t record_size, const cha
     if (record_size <= std::get<0>(vacancy_info = vacancy_at(page, rid.slot_id))) {
         u_int16_t slot_offset = std::get<1>(vacancy_info);
         memcpy(page->data + slot_offset, record, record_size);
+        assert(*((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2)) == record_size);
         return rid;
     } else {
         delete_record(rid);
