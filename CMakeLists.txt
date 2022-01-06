@@ -7,7 +7,7 @@ include_directories(
         ${PROJECT_SOURCE_DIR}/fs/
         ${PROJECT_SOURCE_DIR}/rs/
         ${PROJECT_SOURCE_DIR}/is/
-        ${PROJECT_SOURCE_DIR}/qe/
+        ${PROJECT_SOURCE_DIR}/qs/
         ${PROJECT_SOURCE_DIR}/ms/
         ${PROJECT_SOURCE_DIR}/src/
 )
@@ -24,7 +24,7 @@ set(RS_SRC rs/RecordSystem.cpp rs/RecordSystem.h rs/RecordFile.cpp rs/RecordFile
 
 set(IS_SRC is/IndexSystem.cpp is/IndexSystem.h is/IndexFile.cpp is/IndexFile.h is/IndexFileMeta.h is/IndexPageHeader.h)
 
-set(QE_SRC qe/QueryExecutor.cpp qe/QueryExecutor.h)
+set(QS_SRC qs/QuerySystem.cpp qs/QuerySystem.h)
 
 set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h ms/Value.h ms/Value.cpp)
 

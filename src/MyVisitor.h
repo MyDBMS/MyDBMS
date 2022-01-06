@@ -1,15 +1,18 @@
 #pragma once
 
 #include "SQLBaseVisitor.h"
-#include "../qe/QueryExecutor.h"
-#include "../sm/SystemManager.h"
+#include "../qs/QuerySystem.h"
+#include "../ms/ManageSystem.h"
 
 class MyVisitor : public SQLBaseVisitor {
 public:
 
-    QueryExecutor qe;
+    QuerySystem qs;
 
-    SystemManager sm;
+    ManageSystem ms;
+
+    explicit MyVisitor(const std::string &root_dir): ms(ManageSystem::load_system(root_dir)) {
+    }
     
     virtual antlrcpp::Any visitProgram(SQLParser::ProgramContext *ctx) override {
         /* printf("hello program\n"); */
