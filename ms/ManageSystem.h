@@ -5,6 +5,7 @@
 #include "DatabaseMapping.h"
 #include "TableMapping.h"
 #include "Field.h"
+#include "Value.h"
 
 class ManageSystem {
     /**

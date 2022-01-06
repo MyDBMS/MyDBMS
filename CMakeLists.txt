@@ -11,7 +11,7 @@ set(RS_SRC rs/RecordSystem.cpp rs/RecordSystem.h rs/RecordFile.cpp rs/RecordFile
 
 set(IS_SRC is/IndexSystem.cpp is/IndexSystem.h is/IndexFile.cpp is/IndexFile.h is/IndexFileMeta.h is/IndexPageHeader.h)
 
-set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h)
+set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h ms/Value.h ms/Value.cpp)
 
 add_executable(main main.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC})
 add_executable(fs-test tests/fs-test.cpp ${FS_SRC})
