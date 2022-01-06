@@ -127,6 +127,25 @@ void test_ms() {
         assert(record[2].asInt() == 6);
     }
 
+    // test getting record file
+    {
+        char record[14] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 14, 0, '2', '3', '3'};
+        auto record_file = ms.get_record_file(TABLE_NAME);
+        assert(record_file->insert_record(14, record).page_id == 2);
+    }
+
+    // test other api
+    {
+        assert(ms.get_column_name(TABLE_NAME, 0) == "a");
+        assert(ms.get_column_name(TABLE_NAME, 1) == "b");
+        assert(ms.get_column_name(TABLE_NAME, 2) == "c");
+
+        assert(ms.is_table_exist(TABLE_NAME) == true);
+        assert(ms.is_table_exist("xyz") == false);
+
+        assert(ms.get_record_length_limit(TABLE_NAME) == 16);
+    }
+
     std::filesystem::remove_all(SYSTEM_ROOT);
 }
 

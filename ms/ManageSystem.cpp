@@ -369,3 +369,50 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
 
     return result;
 }
+
+std::string ManageSystem::get_column_name(const std::string &table_name, std::size_t column_id) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    return info.fields[column_id].column_name;
+}
+
+bool ManageSystem::is_table_exist(const std::string &table_name) {
+    assert(current_db.valid);
+
+    auto &map = table_mapping_map[current_db.id];
+    for (std::size_t i = 0; i < map.count; ++i) {
+        if (table_name == map.mapping[i].name) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+RecordFile *ManageSystem::get_record_file(const std::string &table_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    auto file_path = current_db.dir;
+    file_path.append(std::to_string(info.id) + ".txt");
+    return rs.open_file(file_path.c_str());
+}
+
+std::size_t ManageSystem::get_record_length_limit(const std::string &table_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    std::size_t length = (info.field_count + 7) / 8;
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        auto f = info.fields[i];
+        switch (f.type) {
+            case Field::STR:
+                length += 2 + f.str_len;
+                break;
+            case Field::INT:
+                length += 4;
+                break;
+            default:
+                assert(false);
+        }
+    }
+    return length;
+}

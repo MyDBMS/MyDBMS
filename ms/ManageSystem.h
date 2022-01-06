@@ -79,5 +79,13 @@ public:
 
     char *from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, std::size_t &length);
 
-    std::vector<Value> from_bytes_to_record(const std::string &table_name, char* buffer, std::size_t length);
+    std::vector<Value> from_bytes_to_record(const std::string &table_name, char *buffer, std::size_t length);
+
+    std::string get_column_name(const std::string &table_name, std::size_t column_id);
+
+    bool is_table_exist(const std::string &table_name);
+
+    RecordFile *get_record_file(const std::string &table_name);
+
+    std::size_t get_record_length_limit(const std::string &table_name);
 };
