@@ -542,7 +542,6 @@ bool IndexFile::delete_range_key(std::size_t page_id, int lower_bound, int upper
 IndexFile::IndexFile(File *file) : file(file) {
     auto page = file->get_page(0);
     memcpy(&meta, page->data, sizeof meta);
-    assert(meta.node_num > 0);
     assert(meta.root_page > 0);
 }
 
