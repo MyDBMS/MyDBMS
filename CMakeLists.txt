@@ -1,5 +1,16 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 project(my_dbms)
+
+include_directories(
+        ${PROJECT_SOURCE_DIR}/generated/
+        ${PROJECT_SOURCE_DIR}/antlr_runtime/
+        ${PROJECT_SOURCE_DIR}/fs/
+        ${PROJECT_SOURCE_DIR}/rs/
+        ${PROJECT_SOURCE_DIR}/is/
+        ${PROJECT_SOURCE_DIR}/qe/
+        ${PROJECT_SOURCE_DIR}/ms/
+        ${PROJECT_SOURCE_DIR}/src/
+)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -13,9 +24,33 @@ set(RS_SRC rs/RecordSystem.cpp rs/RecordSystem.h rs/RecordFile.cpp rs/RecordFile
 
 set(IS_SRC is/IndexSystem.cpp is/IndexSystem.h is/IndexFile.cpp is/IndexFile.h is/IndexFileMeta.h is/IndexPageHeader.h)
 
+set(QE_SRC qe/QueryExecutor.cpp qe/QueryExecutor.h)
+
 set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h ms/Value.h ms/Value.cpp)
 
-add_executable(main main.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC})
+set(src_dir
+        ${PROJECT_SOURCE_DIR}/generated/SQLLexer.cpp
+        ${PROJECT_SOURCE_DIR}/generated/SQLParser.cpp
+        ${PROJECT_SOURCE_DIR}/generated/SQLVisitor.cpp
+        ${PROJECT_SOURCE_DIR}/generated/SQLBaseVisitor.cpp
+ )
+
+file(GLOB antlr4-cpp-src
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/atn/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/dfa/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/misc/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/support/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/tree/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/tree/pattern/*.cpp
+    ${PROJECT_SOURCE_DIR}/antlr_runtime/tree/xpath/*.cpp
+)
+
+add_library (antlr4-cpp-runtime ${antlr4-cpp-src})
+
+add_executable(my_dbms ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC} src/main.cpp)
+target_link_libraries(my_dbms antlr4-cpp-runtime)
+
 add_executable(fs-test tests/fs-test.cpp ${UTILS_SRC} ${FS_SRC})
 add_executable(rs-test tests/rs-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC})
 add_executable(is-test tests/is-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC})
