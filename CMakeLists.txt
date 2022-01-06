@@ -11,13 +11,17 @@ set(RS_SRC rs/RecordSystem.cpp rs/RecordSystem.h rs/RecordFile.cpp rs/RecordFile
 
 set(IS_SRC is/IndexSystem.cpp is/IndexSystem.h is/IndexFile.cpp is/IndexFile.h is/IndexFileMeta.h is/IndexPageHeader.h)
 
-add_executable(main main.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC})
+set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h)
+
+add_executable(main main.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC})
 add_executable(fs-test tests/fs-test.cpp ${FS_SRC})
 add_executable(rs-test tests/rs-test.cpp ${FS_SRC} ${RS_SRC})
 add_executable(is-test tests/is-test.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC})
+add_executable(ms-test tests/ms-test.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC})
 
 add_test(test-fs ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fs-test)
 add_test(test-rs ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/rs-test)
 add_test(test-is ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/is-test)
+add_test(test-ms ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/ms-test)
 
 enable_testing()
