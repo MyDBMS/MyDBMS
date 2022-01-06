@@ -6,6 +6,7 @@
 #include "TableMapping.h"
 #include "Field.h"
 #include "Value.h"
+#include "../utils/error.h"
 
 class ManageSystem {
     /**
@@ -60,6 +61,8 @@ class ManageSystem {
 
     void update_table_mapping_file(std::size_t db_id);
 
+    std::size_t find_table_by_name(const std::string &table_name);
+
     static void issue();
 
 public:
@@ -71,4 +74,10 @@ public:
     void use_db(const std::string &db_name);
 
     void create_table(const std::string &table_name, const std::vector<Field> &field_list);
+
+    Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
+
+    char *from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, std::size_t &length);
+
+    std::vector<Value> from_bytes_to_record(const std::string &table_name, char* buffer, std::size_t length);
 };

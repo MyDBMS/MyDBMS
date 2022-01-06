@@ -45,6 +45,19 @@ void ManageSystem::update_table_mapping_file(std::size_t db_id) {
     fclose(table_mapping_file);
 }
 
+std::size_t ManageSystem::find_table_by_name(const std::string &table_name) {
+    assert(current_db.valid);
+
+    auto &map = table_mapping_map[current_db.id];
+    for (std::size_t i = 0; i < map.count; ++i) {
+        if (table_name == map.mapping[i].name) {
+            return i;
+        }
+    }
+
+    assert(false);
+}
+
 ManageSystem ManageSystem::load_system(const std::string &root_dir) {
     ManageSystem ms(root_dir);
 
@@ -184,6 +197,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
                 table_info_field.type = Field::STR;
                 table_info_field.str_len = f.str_len;
+                table_info_field.nullable = f.nullable;
                 break;
             case Field::INT:
                 fixed_size += 4;
@@ -191,16 +205,167 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
                 table_info_field.type = Field::INT;
                 table_info_field.str_len = 0;
+                table_info_field.nullable = f.nullable;
                 break;
             default:
                 break;
         }
         ++table_info.field_count;
     }
+    table_info.fixed_size = fixed_size;
+    table_info.var_cnt = var_cnt;
     update_table_mapping_file(current_db.id);
 
     // Create record file
     std::filesystem::path file_path = current_db.dir;
     file_path.append(std::to_string(table_id) + ".txt");
     rs.create_file(file_path.c_str(), fixed_size, var_cnt);
+}
+
+Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {
+    using namespace Error;
+
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    if (info.field_count != values.size()) {
+        return VALUE_COUNT_MISMATCH;
+    }
+
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if (!(values[i].type == Value::NUL
+              || info.fields[i].type == Field::STR && values[i].type == Value::STR
+              || info.fields[i].type == Field::INT && values[i].type == Value::INT)) {
+            return TYPE_MISMATCH;
+        }
+
+        if (!info.fields[i].nullable && values[i].type == Value::NUL) {
+            return FIELD_CANNOT_BE_NULL;
+        }
+
+        if (info.fields[i].type == Field::STR && values[i].asString().length() > info.fields[i].str_len) {
+            return STR_TOO_LONG;
+        }
+    }
+    return NONE;
+}
+
+char *ManageSystem::from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, size_t &l) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    assert(info.field_count == values.size());
+
+    l = (info.field_count + 7) / 8;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        auto v = values[i];
+        switch (v.type) {
+            case Value::NUL:
+                switch (info.fields[i].type) {
+                    case Field::STR:
+                        l += 0;
+                        break;
+                    case Field::INT:
+                        l += 4;
+                        break;
+                    default:
+                        assert(false);
+                }
+                break;
+            case Value::STR:
+                l += 2 + (v.asString().length());
+                break;
+            case Value::INT:
+                l += 4;
+                break;
+            default:
+                assert(false);
+        }
+    }
+
+    auto buffer = new char[l]{};
+    auto bitmap = (uint8_t *) buffer;
+    std::size_t fixed_pos = (info.field_count + 7) / 8;
+    std::size_t var_info_pos = info.fixed_size - info.var_cnt * 2;
+    std::size_t var_data_pos = info.fixed_size;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        auto v = values[i];
+
+        // null bitmap
+        bitmap[i / 8] += ((v.isNull() ? 1u : 0u) << (i & 7));
+
+        // get actual type
+        auto actual_type = v.type;
+        if (actual_type == Value::NUL) {
+            switch (info.fields[i].type) {
+                case Field::STR:
+                    actual_type = Value::STR;
+                    break;
+                case Field::INT:
+                    actual_type = Value::INT;
+                    break;
+                default:
+                    assert(false);
+            }
+        }
+
+        // fill in data
+        switch (actual_type) {
+            case Value::STR:
+                memcpy(buffer + var_data_pos, v.asString().c_str(), v.asString().length());
+                var_data_pos += v.asString().length();
+                *(uint16_t *) (buffer + var_info_pos) = var_data_pos;
+                var_info_pos += 2;
+                break;
+            case Value::INT:
+                *(int *) (buffer + fixed_pos) = v.asInt();
+                fixed_pos += 4;
+                break;
+            default:
+                assert(false);
+        }
+    }
+
+    return buffer;
+}
+
+std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_name, char *buffer, std::size_t length) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+
+    auto result = std::vector<Value>();
+    auto bitmap = (uint8_t *) buffer;
+    std::size_t fixed_pos = (info.field_count + 7) / 8;
+    std::size_t var_info_pos = info.fixed_size - info.var_cnt * 2;
+    std::size_t var_data_pos = info.fixed_size;
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if ((bitmap[i / 8] >> (i & 7)) & 1) {
+            result.push_back(Value::make_value());
+            continue;
+        }
+
+        auto f = info.fields[i];
+        switch (f.type) {
+            case Field::STR: {
+                std::size_t var_data_end_pos = *(uint16_t *) (buffer + var_info_pos);
+                char value[var_data_end_pos - var_data_pos + 1];
+                if (var_data_end_pos - var_data_pos > 0) {
+                    memcpy(value, buffer + var_data_pos, var_data_end_pos - var_data_pos);
+                }
+                value[var_data_end_pos - var_data_pos] = 0;
+                var_data_pos = var_data_end_pos;
+                var_info_pos += 2;
+                result.push_back(Value::make_value(value));
+                break;
+            }
+            case Field::INT: {
+                int value = *(int *) (buffer + fixed_pos);
+                fixed_pos += 4;
+                result.push_back(Value::make_value(value));
+                break;
+            }
+            default:
+                assert(false);
+        }
+    }
+
+    return result;
 }

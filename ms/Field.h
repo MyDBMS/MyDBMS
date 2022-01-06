@@ -9,4 +9,5 @@ struct Field {
         INT,
     } type;
     std::size_t str_len;
+    bool nullable;
 };

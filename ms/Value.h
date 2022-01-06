@@ -1,36 +1,40 @@
 #pragma once
 
+#include <cstring>
 #include <cassert>
 #include "Field.h"
 
 class Value {
     void *data;
 
+    std::size_t str_len;
+
+    explicit Value();
+
     explicit Value(int val);
 
     explicit Value(const std::string &val);
 
 public:
-    const Field::Type type;
+    const enum Type {
+        NUL,
+        STR,
+        INT,
+    } type;
 
     int asInt() const;
 
     std::string asString() const;
 
+    bool isNull() const;
+
+    static Value make_value();
+
     static Value make_value(int value);
 
     static Value make_value(const std::string &value);
 
-    ~Value() {
-        switch (type) {
-            case Field::STR:
-                delete (char *) data;
-                break;
-            case Field::INT:
-                delete (int *) data;
-                break;
-            default:
-                assert(false);
-        }
-    }
+    Value(const Value &rhs);
+
+    ~Value();
 };
