@@ -28,6 +28,7 @@ struct TableMapping {
             std::size_t str_len{};
             bool nullable{};
             bool indexed{};
+            bool has_def{};
             int def_int{};
             float def_float{};
             char def_str[MAX_DEFAULT_STR_LEN + 1]{};

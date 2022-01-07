@@ -12,6 +12,7 @@ struct Field {
     } type;
     std::size_t str_len;
     bool nullable;
+    bool has_def;
     int def_int;
     float def_float;
     std::string def_str;

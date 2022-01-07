@@ -176,8 +176,7 @@ void test_ms() {
 
     // test indexing
     {
-        std::vector<std::string> column_list{"c"};
-        ms.create_index(TABLE_NAME, column_list);
+        ms.create_index(TABLE_NAME, {"c"});
 
         auto indices = ms.get_index_ids(TABLE_NAME);
         assert(indices.size() == 1);
@@ -188,8 +187,6 @@ void test_ms() {
 
         auto index_file = ms.get_index_file(TABLE_NAME, "c");
         index_file->close();
-
-        ms.drop_index(TABLE_NAME, column_list);
     }
 
     // test altering pk and foreign keys
@@ -223,6 +220,7 @@ void test_ms() {
         oss.str("");
         ms.show_dbs();
         ms.show_tables();
+        ms.describe_table(TABLE_NAME);
         std::string expected = R"(+----------+
 | Database |
 +----------+
@@ -236,12 +234,25 @@ void test_ms() {
 | test_table        |
 +-------------------+
 2 rows in set
++-------+------------+------+---------+
+| Field | Type       | Null | Default |
++-------+------------+------+---------+
+| a     | INT        | NO   | NULL    |
+| b     | VARCHAR(5) | NO   | NULL    |
+| c     | INT        | NO   | NULL    |
+| d     | FLOAT      | NO   | NULL    |
++-------+------------+------+---------+
+4 rows in set
+PRIMARY KEY test_pk2(a);
+FOREIGN KEY foreign2(c) REFERENCES foreign_tb(f);
+INDEX (c);
 )";
         assert(oss.str() == expected);
     }
 
     // Test api related to dropping
     {
+        ms.drop_index(TABLE_NAME, {"c"});
         ms.drop_table(TABLE_NAME);
         ms.drop_db(DB_NAME);
     }

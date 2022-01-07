@@ -29,6 +29,8 @@ public:
     void error(const std::string &msg) const;
 
     void warning(const std::string &msg) const;
+
+    void write_line(const std::string &msg) const;
 };
 
 class StdioFrontend : public Frontend {

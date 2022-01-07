@@ -76,6 +76,10 @@ void Frontend::warning(const std::string &msg) const {
     write_string("\x1b[0m\n");
 }
 
+void Frontend::write_line(const std::string &msg) const {
+    write_string(msg + "\n");
+}
+
 void StdioFrontend::write_string(const std::string &s) const {
     std::cout << s;
 }

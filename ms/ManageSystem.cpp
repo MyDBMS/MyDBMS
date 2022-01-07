@@ -63,6 +63,22 @@ std::size_t ManageSystem::find_table_by_name(const std::string &table_name, bool
     assert(false);
 }
 
+std::size_t ManageSystem::find_table_by_id(std::size_t table_id, bool no_assert) {
+    assert(current_db.valid);
+
+    auto &map = table_mapping_map[current_db.id];
+    for (std::size_t i = 0; i < map.count; ++i) {
+        if (table_id == map.mapping[i].id) {
+            return i;
+        }
+    }
+
+    if (no_assert) {
+        return map.count;
+    }
+    assert(false);
+}
+
 std::size_t ManageSystem::find_column_by_name(std::size_t table_loc, const std::string &column_name, bool no_assert) {
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     for (std::size_t i = 0; i < info.field_count; ++i) {
@@ -137,7 +153,7 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
             frontend->warning("In foreign restriction, column name of " + column_name + " cannot be found.");
             return false;
         }
-        table_info_field.column_bitmap |= (1u << column_id);
+        table_info_field.foreign_column_bitmap |= (1u << column_id);
     }
     bool exist = false;
     for (std::size_t i = 0; i < foreign_table.related_table_count; ++i) {
@@ -391,6 +407,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
         strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
         table_info_field.nullable = f.nullable;
         table_info_field.indexed = false;
+        table_info_field.has_def = f.has_def;
 
         ++table_info.field_count;
     }
@@ -447,6 +464,89 @@ void ManageSystem::drop_table(const std::string &table_name) {
     update_table_mapping_file(current_db.id);
 
     frontend->ok(0);
+}
+
+void ManageSystem::describe_table(const std::string &table_name) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    Frontend::Table out_table{{"Field",   {}},
+                              {"Type",    {}},
+                              {"Null",    {}},
+                              {"Default", {}}};
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        auto &f = info.fields[i];
+        out_table[0].values.emplace_back(f.column_name);
+        std::string type;
+        std::string def;
+        switch (f.type) {
+            case Field::INT:
+                type = "INT";
+                def = f.has_def ? std::to_string(f.def_int) : "NULL";
+                break;
+            case Field::FLOAT:
+                type = "FLOAT";
+                def = f.has_def ? std::to_string(f.def_float) : "NULL";
+                break;
+            case Field::STR:
+                type = "VARCHAR(" + std::to_string(f.str_len) + ")";
+                def = f.has_def ? f.def_str : "NULL";
+                break;
+            default:
+                assert(false);
+                break;
+        }
+        out_table[1].values.emplace_back(type);
+        out_table[2].values.emplace_back(f.nullable ? "YES" : "NO");
+        out_table[3].values.emplace_back(def);
+    }
+    frontend->print_table(out_table);
+    for (std::size_t i = 0; i < info.primary_field_count; ++i) {
+        auto &f = info.primary_fields[i];
+        std::string primary_msg = "PRIMARY KEY ";
+        primary_msg += f.restriction_name;
+        bool l_par_printed = false;
+        for (int c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                primary_msg += (l_par_printed ? ", " : "(");
+                primary_msg += info.fields[c].column_name;
+                l_par_printed = true;
+            }
+        }
+        primary_msg += ");";
+        frontend->write_line(primary_msg);
+    }
+    for (std::size_t i = 0; i < info.foreign_field_count; ++i) {
+        auto &f = info.foreign_fields[i];
+        std::string foreign_msg = "FOREIGN KEY ";
+        foreign_msg += f.restriction_name;
+        bool l_par_printed = false;
+        for (int c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                foreign_msg += (l_par_printed ? ", " : "(");
+                foreign_msg += info.fields[c].column_name;
+                l_par_printed = true;
+            }
+        }
+        foreign_msg += ") REFERENCES ";
+        auto foreign_table = table_mapping_map[current_db.id].mapping[find_table_by_id(f.foreign_table_id)];
+        foreign_msg += foreign_table.name;
+        l_par_printed = false;
+        for (int c = 0; c < foreign_table.field_count; ++c) {
+            if ((f.foreign_column_bitmap >> c) & 1) {
+                foreign_msg += (l_par_printed ? ", " : "(");
+                foreign_msg += foreign_table.fields[c].column_name;
+                l_par_printed = true;
+            }
+        }
+        foreign_msg += ");";
+        frontend->write_line(foreign_msg);
+    }
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        auto &f = info.fields[i];
+        if (f.indexed) {
+            frontend->write_line(std::string("INDEX (") + f.column_name + ");");
+        }
+    }
 }
 
 void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {

@@ -77,6 +77,8 @@ class ManageSystem {
 
     std::size_t find_table_by_name(const std::string &table_name, bool no_assert = false);
 
+    std::size_t find_table_by_id(std::size_t table_id, bool no_assert = false);
+
     std::size_t find_column_by_name(std::size_t table_loc, const std::string &column_name, bool no_assert = false);
 
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
@@ -106,6 +108,8 @@ public:
                       const std::vector<ForeignField> &foreign_field_list);
 
     void drop_table(const std::string &table_name);
+
+    void describe_table(const std::string &table_name);
 
     void create_index(const std::string &table_name, const std::vector<std::string> &column_list);
 
