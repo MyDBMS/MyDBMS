@@ -19,13 +19,18 @@ void QuerySystem::insert_record(std::string table_name, std::vector<Value> value
     auto indexs = ms.get_index_ids(table_name);
     for(auto column_id : indexs){
         auto column_name = ms.get_column_name(table_name, column_id);
-        int key = values[column_id].asInt();
-        auto index_file = ms.get_index_file(table_name, column_name);
-        index_file->insert_record(key, rid);
+        auto value = values[column_id];
+        if (value.type != Value::NUL){
+            int key = value.asInt();
+            /* std::cout << "[QuerySystem] insert record " << table_name << " " << column_name << " " << key << std::endl; */
+            auto index_file = ms.get_index_file(table_name, column_name);
+            index_file->insert_record(key, rid);
+        }
     }
 }
 
 void QuerySystem::search(std::string table_name, std::string column_name, int key){
+    /* std::cout << "[QuerySystem] search " << table_name << " " << column_name << " " << key << std::endl; */
     if (!ms.is_table_exist(table_name)){
         printf("Error: table is not exist!\n");
         return;
@@ -35,7 +40,7 @@ void QuerySystem::search(std::string table_name, std::string column_name, int ke
         RID rid;
         IndexScan index_scan;
         index_file->search(key, key, index_scan);
-        if (index_scan.get_next_entry(rid)){
+        while (index_scan.get_next_entry(rid)){
             //  从记录系统里查找
             auto record_file = ms.get_record_file(table_name);
             // 向管理系统要一下长度上限

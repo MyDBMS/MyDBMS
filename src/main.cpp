@@ -42,7 +42,7 @@ int main(){
         ch = getchar();
         sql += ch;
         if (ch == ';'){
-            if (sql == "EXIT;") break;  //  退出MyDBMS
+            if (sql.substr(sql.length() - 5, 5) == "EXIT;") break;  //  退出MyDBMS
             parse(sql);
             sql = "";
         }
