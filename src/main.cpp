@@ -12,7 +12,7 @@
 
 using namespace antlr4;
 
-auto ms = ManageSystem::load_system("bin/root");
+auto ms = ManageSystem::load_system("bin/root", new StdioFrontend());
 MyVisitor iVisitor{ms/*YourVisitor的构造函数*/};
 
 // 返回类型根据你的visitor决定
