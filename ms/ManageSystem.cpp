@@ -125,6 +125,44 @@ void ManageSystem::create_db(const std::string &db_name) {
     std::filesystem::create_directory(db_directory);
 }
 
+void ManageSystem::drop_db(const std::string &db_name) {
+    if (current_db.valid) {
+        current_db.valid = false;
+    }
+
+    // Find db by name
+    std::size_t idx = 0;
+    while (idx < db_mapping.count) {
+        if (db_mapping.mapping[idx].name == db_name) {
+            break;
+        }
+        ++idx;
+    }
+    if (idx == db_mapping.count) {
+        issue();
+        return;
+    }
+
+    // Remove table mapping
+    table_mapping_map.erase(db_mapping.mapping[idx].id);
+    auto global_file_path = global_root;
+    global_file_path.append(std::to_string(db_mapping.mapping[idx].id) + ".txt");
+    std::filesystem::remove(global_file_path);
+
+    // Remove directory
+    auto directory_path = base_root;
+    directory_path.append(std::to_string(db_mapping.mapping[idx].id));
+    std::filesystem::remove_all(directory_path);
+
+    // Remove record from db mapping
+    --db_mapping.count;
+    while (idx < db_mapping.count) {
+        db_mapping.mapping[idx] = db_mapping.mapping[idx + 1];
+        ++idx;
+    }
+    update_db_mapping_file();
+}
+
 void ManageSystem::use_db(const std::string &db_name) {
     // Check if there is already an open db
     if (current_db.valid) {
@@ -220,6 +258,25 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
     std::filesystem::path file_path = current_db.dir;
     file_path.append(std::to_string(table_id) + ".txt");
     rs.create_file(file_path.c_str(), fixed_size, var_cnt);
+}
+
+void ManageSystem::drop_table(const std::string &table_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &mapping = table_mapping_map[current_db.id].mapping;
+    auto &info = mapping[table_id];
+
+    // Remove record file
+    std::filesystem::path file_path = current_db.dir;
+    file_path.append(std::to_string(info.id) + ".txt");
+    RecordSystem::remove_file(file_path.c_str());
+
+    // Remove table from table mapping info
+    --table_mapping_map[current_db.id].count;
+    while (table_id < table_mapping_map[current_db.id].count) {
+        mapping[table_id] = mapping[table_id + 1];
+        ++table_id;
+    }
+    update_table_mapping_file(current_db.id);
 }
 
 Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {

@@ -71,9 +71,13 @@ public:
 
     void create_db(const std::string &db_name);
 
+    void drop_db(const std::string &db_name);
+
     void use_db(const std::string &db_name);
 
     void create_table(const std::string &table_name, const std::vector<Field> &field_list);
+
+    void drop_table(const std::string &table_name);
 
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 

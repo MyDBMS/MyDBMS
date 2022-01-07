@@ -146,6 +146,12 @@ void test_ms() {
         assert(ms.get_record_length_limit(TABLE_NAME) == 16);
     }
 
+    // Test api related to dropping
+    {
+        ms.drop_table(TABLE_NAME);
+        ms.drop_db(DB_NAME);
+    }
+
     std::filesystem::remove_all(SYSTEM_ROOT);
 }
 
