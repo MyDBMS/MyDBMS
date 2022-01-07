@@ -55,7 +55,8 @@ void test_value() {
 }
 
 void test_ms() {
-    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT);
+    std::strstream ss;
+    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StrStreamFrontend(ss));
     ms.create_db(DB_NAME);
     ms.use_db(DB_NAME);
 
@@ -162,6 +163,25 @@ void test_ms() {
         assert(ms.is_table_exist("xyz") == false);
 
         assert(ms.get_record_length_limit(TABLE_NAME) == 16);
+    }
+
+    {
+        ms.show_dbs();
+        ms.show_tables();
+        std::string expected = R"(+----------+
+| Database |
++----------+
+| test_db  |
++----------+
+1 row in set
++-------------------+
+| Tables_in_test_db |
++-------------------+
+| test_table        |
++-------------------+
+1 row in set
+)";
+        assert(ss.str() == expected);
     }
 
     // Test api related to dropping

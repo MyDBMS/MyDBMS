@@ -7,7 +7,8 @@
 #include "TableMapping.h"
 #include "Field.h"
 #include "Value.h"
-#include "../utils/error.h"
+#include "../utils/Error.h"
+#include "../utils/Frontend.h"
 
 class ManageSystem {
     /**
@@ -54,7 +55,9 @@ class ManageSystem {
 
     IndexSystem is;
 
-    explicit ManageSystem(const std::string &root_dir);
+    const Frontend *frontend;
+
+    explicit ManageSystem(const std::string &root_dir, const Frontend *frontend);
 
     void load_db_mapping_file();
 
@@ -74,11 +77,15 @@ class ManageSystem {
 
 public:
 
-    static ManageSystem load_system(const std::string &root_dir);
+    static ManageSystem load_system(const std::string &root_dir, const Frontend *frontend);
 
     void create_db(const std::string &db_name);
 
     void drop_db(const std::string &db_name);
+
+    void show_dbs();
+
+    void show_tables();
 
     void use_db(const std::string &db_name);
 

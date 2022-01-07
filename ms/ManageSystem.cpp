@@ -1,11 +1,12 @@
 #include "ManageSystem.h"
 #include <cstring>
 
-ManageSystem::ManageSystem(const std::string &root_dir) :
+ManageSystem::ManageSystem(const std::string &root_dir, const Frontend *frontend) :
         system_root(root_dir),
         global_root(std::filesystem::path(root_dir).append("global")),
         base_root(std::filesystem::path(root_dir).append("base")),
-        db_mapping_path(std::filesystem::path(root_dir).append("global").append("global.txt")) {}
+        db_mapping_path(std::filesystem::path(root_dir).append("global").append("global.txt")),
+        frontend(frontend) {}
 
 void ManageSystem::load_db_mapping_file() {
     assert(std::filesystem::is_regular_file(db_mapping_path));
@@ -75,8 +76,8 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
     return info.fields[column_id].column_name;
 }
 
-ManageSystem ManageSystem::load_system(const std::string &root_dir) {
-    ManageSystem ms(root_dir);
+ManageSystem ManageSystem::load_system(const std::string &root_dir, const Frontend *frontend) {
+    ManageSystem ms(root_dir, frontend);
 
     if (!std::filesystem::exists(ms.system_root)) {
         std::filesystem::create_directories(ms.system_root);
@@ -178,6 +179,29 @@ void ManageSystem::drop_db(const std::string &db_name) {
         ++idx;
     }
     update_db_mapping_file();
+}
+
+void ManageSystem::show_dbs() {
+    Frontend::Column c;
+    c.name = "Database";
+    for (std::size_t i = 0; i < db_mapping.count; ++i) {
+        c.values.emplace_back(db_mapping.mapping[i].name);
+    }
+    frontend->print_table({c});
+}
+
+void ManageSystem::show_tables() {
+    if (!current_db.valid) {
+        issue();
+        return;
+    }
+
+    Frontend::Column c;
+    c.name = std::string("Tables_in_") + db_mapping.mapping[current_db.loc].name;
+    for (std::size_t i = 0; i < table_mapping_map[current_db.id].count; ++i) {
+        c.values.emplace_back(table_mapping_map[current_db.id].mapping[i].name);
+    }
+    frontend->print_table({c});
 }
 
 void ManageSystem::use_db(const std::string &db_name) {
