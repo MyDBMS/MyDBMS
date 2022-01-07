@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SQLBaseVisitor.h"
+#include "../generated/SQLBaseVisitor.h"
 #include "../qs/QuerySystem.h"
 #include "../ms/ManageSystem.h"
 
@@ -9,88 +9,147 @@ public:
 
     QuerySystem qs;
 
-    ManageSystem ms;
+    ManageSystem &ms;
 
-    explicit MyVisitor(const std::string &root_dir): ms(ManageSystem::load_system(root_dir)) {
+    explicit MyVisitor(ManageSystem &ms): ms(ms), qs(ms) {
     }
     
-    virtual antlrcpp::Any visitProgram(SQLParser::ProgramContext *ctx) override {
-        /* printf("hello program\n"); */
-        printf("\n");
-        auto res = visitChildren(ctx);
-        printf("\n");
-        return res;
-    }
-
-    virtual antlrcpp::Any visitStatement(SQLParser::StatementContext *ctx) override {
-        /* printf("hello statement\n"); */
-        auto res = visitChildren(ctx);
-        if (ctx->db_statement()){
-            auto db_ctx = ctx->db_statement();
-            switch(db_ctx->db_stmt_type){
-                case 1: 
-                    printf("It's a create db stmt!\n");
-                    break;
-                case 2: 
-                    printf("It's a drop db stmt!\n");
-                    break;
-                case 3: 
-                    printf("It's a show db stmt!\n");
-                    break;
-                case 4: 
-                    printf("It's a use db stmt!\n");
-                    break;
-                case 5: 
-                    printf("It's a show db stmt!\n");
-                    break;
-                case 6: 
-                    printf("It's a show db index stmt!\n");
-                    break;
-                default:
-                    printf("Ashitemaru is lazy\n");
-                    break;
-            }
+    Value gen_Value(SQLParser::ValueContext *ctx){
+        if (ctx->Integer()){  //  是整型
+            return Value::make_value(std::stoi(ctx->Integer()->getText()));
         }
-        else printf("It's not a db stmt!\n");
-        return res;
+        else if (ctx->String()){  //  是字符串型
+            return Value::make_value(ctx->String()->getText());
+        }
+        else if (ctx->Null()){  //  是NULL型
+            return Value::make_value();
+        }
     }
 
     virtual antlrcpp::Any visitCreate_db(SQLParser::Create_dbContext *ctx) override {
         auto res = visitChildren(ctx);
-        auto ident = ctx->Identifier();
-        std::string name = ident->getText();
-        std::cout << "database " + name + " is created" << std::endl;
-        ctx->db_stmt_type = 1;
+        std::string db_name = ctx->Identifier()->getText();
+        ms.create_db(db_name);
         return res;
     }
 
     virtual antlrcpp::Any visitDrop_db(SQLParser::Drop_dbContext *ctx) override {
         auto res = visitChildren(ctx);
-        ctx->db_stmt_type = 2;
-        return res;
-    }
-
-    virtual antlrcpp::Any visitShow_dbs(SQLParser::Show_dbsContext *ctx) override {
-        auto res = visitChildren(ctx);
-        ctx->db_stmt_type = 3;
+        std::string db_name = ctx->Identifier()->getText();
+        ms.drop_db(db_name);
         return res;
     }
 
     virtual antlrcpp::Any visitUse_db(SQLParser::Use_dbContext *ctx) override {
         auto res = visitChildren(ctx);
-        ctx->db_stmt_type = 4;
+        std::string db_name = ctx->Identifier()->getText();
+        ms.use_db(db_name);
         return res;
     }
 
-    virtual antlrcpp::Any visitShow_tables(SQLParser::Show_tablesContext *ctx) override {
+    virtual antlrcpp::Any visitCreate_table(SQLParser::Create_tableContext *ctx) override {
         auto res = visitChildren(ctx);
-        ctx->db_stmt_type = 5;
+        std::string table_name = ctx->Identifier()->getText();
+        auto field_list_ctx = ctx->field_list();
+        std::vector<Field> field_list;
+        field_list.clear();
+        for(auto field_ctx : field_list_ctx->field()){
+            field_list.push_back(field_ctx->field_val);
+        }
+        ms.create_table(table_name, field_list);
         return res;
     }
 
-    virtual antlrcpp::Any visitShow_indexes(SQLParser::Show_indexesContext *ctx) override {
+    virtual antlrcpp::Any visitNormal_field(SQLParser::Normal_fieldContext *ctx) override {
         auto res = visitChildren(ctx);
-        ctx->db_stmt_type = 6;
+        Field field;
+        field.name = ctx->Identifier()->getText();
+        auto type_ctx = ctx->type_();
+        if (type_ctx->children[0]->getText() == "INT"){
+            field.type = Field::Type::INT;
+        }
+        else if (type_ctx->children[0]->getText() == "VARCHAR"){
+            field.type = Field::Type::STR;
+            field.str_len = std::stoi(type_ctx->Integer()->getText());
+        }
+        if (ctx->Null()){  //  'NOT' Null
+            field.nullable = false;
+        }
+        else field.nullable = true;
+        ctx->field_val = field;
+        return res;
+    }
+
+    virtual antlrcpp::Any visitDrop_table(SQLParser::Drop_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        ms.drop_table(table_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_add_index(SQLParser::Alter_add_indexContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        std::vector<std::string> column_list;
+        column_list.clear();
+        for(auto column : ctx->identifiers()->Identifier()){
+            std::string column_name = column->getText();
+            column_list.push_back(column_name);
+        }
+        ms.create_index(table_name, column_list);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_drop_index(SQLParser::Alter_drop_indexContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        std::vector<std::string> column_list;
+        column_list.clear();
+        for(auto column : ctx->identifiers()->Identifier()){
+            std::string column_name = column->getText();
+            column_list.push_back(column_name);
+        }
+        ms.drop_index(table_name, column_list);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitInsert_into_table(SQLParser::Insert_into_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        auto value_lists_ctx = ctx->value_lists();
+        auto value_list_ctx_vec = value_lists_ctx->value_list();
+        for(auto value_list_ctx : value_list_ctx_vec){
+            std::vector<Value> values;
+            values.clear();
+            auto value_ctx_vec = value_list_ctx->value();
+            for(auto value_ctx : value_ctx_vec){
+                values.push_back(gen_Value(value_ctx));
+            }
+            qs.insert_record(table_name, values);
+        }
+        return res;
+    }
+
+    //  TODO: 变成真正的版本
+    virtual antlrcpp::Any visitSelect_table(SQLParser::Select_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        //  无视selectors，视为 * 
+        //  表视为只有一个
+        std::string table_name = (ctx->identifiers()->Identifier())[0]->getText();
+        //  where and clause 视为有且仅有一项
+        auto wc_ctx = (ctx->where_and_clause()->where_clause())[0];
+        if (wc_ctx->wc_type == 1){
+            qs.search(table_name, wc_ctx->column_name, wc_ctx->key);
+        }
+        return res;
+    }
+
+    virtual antlrcpp::Any visitWhere_operator_expression(SQLParser::Where_operator_expressionContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ctx->wc_type = 1;
+        //  默认是 column = expr,文法里 column 是 table.column，取第二个 ident
+        ctx->column_name = (ctx->column()->Identifier())[1]->getText();
+        ctx->key = std::stoi(ctx->expression()->value()->Integer()->getText());
         return res;
     }
 };

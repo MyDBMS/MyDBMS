@@ -6,6 +6,8 @@
 
 #include "antlr4-runtime.h"
 
+#include "../ms/ManageSystem.h"
+
 
 
 
@@ -418,6 +420,8 @@ public:
 
     virtual size_t getRuleIndex() const override;
 
+    Field field_val;
+
    
   };
 
@@ -537,6 +541,12 @@ public:
     using antlr4::ParserRuleContext::copyFrom;
 
     virtual size_t getRuleIndex() const override;
+
+    int wc_type;
+
+    std::string column_name;
+
+    int key;
 
    
   };

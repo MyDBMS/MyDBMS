@@ -14,6 +14,8 @@ include_directories(
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_CXX_FLAGS "-std=c++17")
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(UTILS_SRC utils/error.h)
@@ -28,12 +30,16 @@ set(QS_SRC qs/QuerySystem.cpp qs/QuerySystem.h)
 
 set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h ms/Value.h ms/Value.cpp)
 
-set(src_dir
-        ${PROJECT_SOURCE_DIR}/generated/SQLLexer.cpp
-        ${PROJECT_SOURCE_DIR}/generated/SQLParser.cpp
-        ${PROJECT_SOURCE_DIR}/generated/SQLVisitor.cpp
-        ${PROJECT_SOURCE_DIR}/generated/SQLBaseVisitor.cpp
- )
+set(GR_SRC
+        generated/SQLLexer.cpp
+        generated/SQLLexer.h
+        generated/SQLParser.cpp
+        generated/SQLParser.h
+        generated/SQLVisitor.cpp
+        generated/SQLVisitor.h
+        generated/SQLBaseVisitor.cpp
+        generated/SQLBaseVisitor.h
+)
 
 file(GLOB antlr4-cpp-src
     ${PROJECT_SOURCE_DIR}/antlr_runtime/*.cpp
@@ -48,7 +54,7 @@ file(GLOB antlr4-cpp-src
 
 add_library (antlr4-cpp-runtime ${antlr4-cpp-src})
 
-add_executable(my_dbms ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC} src/main.cpp)
+add_executable(my_dbms ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${QS_SRC} ${MS_SRC} ${GR_SRC} src/main.cpp)
 target_link_libraries(my_dbms antlr4-cpp-runtime)
 
 add_executable(fs-test tests/fs-test.cpp ${UTILS_SRC} ${FS_SRC})
