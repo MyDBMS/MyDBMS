@@ -228,6 +228,33 @@ RID RecordFile::update_record(const RID &rid, std::size_t record_size, const cha
     }
 }
 
+RID RecordFile::find_from(const RID &rid) const {
+    for (std::size_t curr_page = rid.page_id; curr_page < meta.page_cnt; ++curr_page) {
+        if (curr_page < 2) continue;
+        if (curr_page % (PAGE_SIZE / 2 + 1) == 1) continue;
+
+        auto page = file->get_page(curr_page);
+        auto header = (RecordPageHeader *) page->data;
+
+        for (std::size_t curr_slot = (curr_page == rid.page_id ? rid.slot_id + 1 : 0);
+             curr_slot < header->slot_cnt; ++curr_slot) {
+            if (get_slot_offset(page, curr_slot) != 0) {
+                return {curr_page, curr_slot};
+            }
+        }
+    }
+
+    return {0, 0};
+}
+
+RID RecordFile::find_first() const {
+    return find_from({0, 0});
+}
+
+RID RecordFile::find_next(const RID &rid) const {
+    return find_from(rid);
+}
+
 void RecordFile::close() {
     if (file) file->close();
     file = nullptr;

@@ -59,6 +59,13 @@ class RecordFile {
      */
     void fix_page_header(BufferPage *page);
 
+    /**
+     * 为 <code>find_first</code> 和 <code>find_next</code> 服务。
+     * @param rid
+     * @return
+     */
+    RID find_from(const RID &rid) const;
+
 public:
 
     explicit RecordFile(File *file);
@@ -93,6 +100,21 @@ public:
      * @return             新插入记录的唯一标识
      */
     RID update_record(const RID &rid, std::size_t record_size, const char *record);
+
+    /**
+     * 查找第一条有效记录的唯一标识。若不存在，返回 <code>{0, 0}</code>。
+     * @return             记录唯一标识。
+     */
+    RID find_first() const;
+
+    /**
+     * 从当前记录唯一标识查找下一条有效记录的唯一标识，并返回。
+     * <br/>
+     * 若失败，返回的 RID 两个字段均为 0。
+     * @param rid          传入当前记录唯一标识，并用于保存查找到的下一条有效记录的唯一标识。
+     * @return             是否找到。
+     */
+    RID find_next(const RID &rid) const;
 
     /**
      * 关闭文件。

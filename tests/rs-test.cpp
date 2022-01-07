@@ -86,6 +86,22 @@ void simple_test() {
         assert(rid.page_id == 2);
         assert(rid.slot_id == 3);
 
+        rid = file->find_first();
+        assert(rid.page_id == 2);
+        assert(rid.slot_id == 1);
+
+        rid = file->find_next(rid);
+        assert(rid.page_id == 2);
+        assert(rid.slot_id == 2);
+
+        rid = file->find_next(rid);
+        assert(rid.page_id == 2);
+        assert(rid.slot_id == 3);
+
+        rid = file->find_next(rid);
+        assert(rid.page_id == 0);
+        assert(rid.slot_id == 0);
+
         // 关闭文件
         file->close();
     }
