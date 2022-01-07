@@ -56,7 +56,7 @@ public:
         for(auto field_ctx : field_list_ctx->field()){
             field_list.push_back(field_ctx->field_val);
         }
-        ms.create_table(table_name, field_list, {}, {});
+        ms.create_table(table_name, field_list, {}, {});  // TODO: primary keys and foreign keys
         return res;
     }
 

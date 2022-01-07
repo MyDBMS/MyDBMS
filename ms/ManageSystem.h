@@ -81,6 +81,10 @@ class ManageSystem {
 
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
+    bool add_primary_key(std::size_t table_loc, const PrimaryField &f);
+
+    bool add_foreign_key(std::size_t table_loc, const ForeignField &f);
+
 public:
 
     const Frontend *frontend;
@@ -106,6 +110,14 @@ public:
     void create_index(const std::string &table_name, const std::vector<std::string> &column_list);
 
     void drop_index(const std::string &table_name, const std::vector<std::string> &column_list);
+
+    void add_primary_key(const std::string &table_name, const PrimaryField &primary_restriction);
+
+    void drop_primary_key(const std::string &table_name, const std::string &restriction_name);
+
+    void add_foreign_key(const std::string &table_name, const ForeignField &foreign_restriction);
+
+    void drop_foreign_key(const std::string &table_name, const std::string &restriction_name);
 
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 

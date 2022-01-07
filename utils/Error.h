@@ -7,5 +7,6 @@ namespace Error {
         TYPE_MISMATCH,
         STR_TOO_LONG,
         FIELD_CANNOT_BE_NULL,
+        PRIMARY_RESTRICTION_FAIL,
     };
 }

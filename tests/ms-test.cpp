@@ -131,6 +131,15 @@ void test_ms() {
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::FIELD_CANNOT_BE_NULL);
     }
 
+    {
+        std::vector<Value> values;
+        values.push_back(Value::make_value(2));
+        values.push_back(Value::make_value("xyz"));
+        values.push_back(Value::make_value(0));
+        values.push_back(Value::make_value(1.0f));
+        assert(ms.validate_insert_data(TABLE_NAME, values) == Error::NONE);
+    }
+
     // test comparison
     {
         assert(Value::make_value() == Value::make_value());
@@ -181,6 +190,14 @@ void test_ms() {
         index_file->close();
 
         ms.drop_index(TABLE_NAME, column_list);
+    }
+
+    // test altering pk and foreign keys
+    {
+        ms.drop_primary_key(TABLE_NAME, "test_pk");
+        ms.add_primary_key(TABLE_NAME, {"test_pk2", {"a"}});
+        ms.drop_foreign_key(TABLE_NAME, "foreign");
+        ms.add_foreign_key(TABLE_NAME, {"foreign2", {"c"}, FOREIGN_TABLE_NAME, {"f"}});
     }
 
     // test getting record file

@@ -1,4 +1,5 @@
 #include "ManageSystem.h"
+#include "TableMapping.h"
 #include <cstring>
 
 ManageSystem::ManageSystem(const std::string &root_dir, const Frontend *frontend) :
@@ -80,6 +81,75 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     assert(column_id >= 0 && column_id < info.field_count);
     return info.fields[column_id].column_name;
+}
+
+bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f) {
+    auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
+    auto &table_info_field = table_info.primary_fields[table_info.primary_field_count++];
+    if (f.name.length() > MAX_PRIMARY_RESTRICTION_LEN) {
+        frontend->warning(
+                "Primary restriction name shall be no longer than " + std::to_string(MAX_PRIMARY_RESTRICTION_LEN) +
+                " chars.");
+    }
+    strcpy(table_info_field.restriction_name, f.name.substr(0, MAX_PRIMARY_RESTRICTION_LEN).c_str());
+    table_info_field.column_bitmap = 0;
+    for (const auto &column_name: f.columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("In primary restriction, column name of " + column_name + " cannot be found.");
+            return false;
+        }
+        table_info_field.column_bitmap |= (1u << column_id);
+    }
+    return true;
+}
+
+bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f) {
+    auto &table_mapping = table_mapping_map[current_db.id];
+    auto &table_info = table_mapping.mapping[table_loc];
+    auto &table_info_field = table_info.foreign_fields[table_info.foreign_field_count++];
+    if (f.name.length() > MAX_FOREIGN_RESTRICTION_LEN) {
+        frontend->warning(
+                "Foreign restriction name shall be no longer than " + std::to_string(MAX_FOREIGN_RESTRICTION_LEN) +
+                " chars.");
+    }
+    strcpy(table_info_field.restriction_name, f.name.substr(0, MAX_FOREIGN_RESTRICTION_LEN).c_str());
+    table_info_field.column_bitmap = 0;
+    for (const auto &column_name: f.columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("In foreign restriction, column name of " + column_name + " cannot be found.");
+            return false;
+        }
+        table_info_field.column_bitmap |= (1u << column_id);
+    }
+    auto foreign_table_loc = find_table_by_name(f.foreign_table_name, true);
+    if (foreign_table_loc == table_mapping.count) {
+        frontend->warning("In foreign restriction, table name of " + f.foreign_table_name + " cannot be found.");
+        return false;
+    }
+    auto &foreign_table = table_mapping.mapping[foreign_table_loc];
+    table_info_field.foreign_table_id = foreign_table.id;
+    table_info_field.foreign_column_bitmap = 0;
+    for (const auto &column_name: f.foreign_columns) {
+        auto column_id = find_column_by_name(foreign_table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("In foreign restriction, column name of " + column_name + " cannot be found.");
+            return false;
+        }
+        table_info_field.column_bitmap |= (1u << column_id);
+    }
+    bool exist = false;
+    for (std::size_t i = 0; i < foreign_table.related_table_count; ++i) {
+        if (foreign_table.related_table_ids[i] == table_loc) {
+            exist = true;
+            break;
+        }
+    }
+    if (!exist) {
+        foreign_table.related_table_ids[foreign_table.related_table_count++] = table_mapping.count;
+    }
+    return true;
 }
 
 ManageSystem ManageSystem::load_system(const std::string &root_dir, const Frontend *frontend) {
@@ -252,6 +322,16 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
         return;
     }
 
+    if (primary_field_list.size() > MAX_PRIMARY_FIELD_COUNT) {
+        frontend->error("Too many primary fields!");
+        return;
+    }
+
+    if (foreign_field_list.size() > MAX_FOREIGN_FIELD_COUNT) {
+        frontend->error("Too many foreign fields!");
+        return;
+    }
+
     // Add record to table mapping
     TableMapping &table_mapping = table_mapping_map[current_db.id];
     std::size_t current_id_max = 0;
@@ -268,7 +348,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
     table_mapping.mapping[table_mapping.count].id = table_id;
     strcpy(table_mapping.mapping[table_mapping.count].name, table_name.c_str());
     auto &table_info = table_mapping.mapping[table_mapping.count];
-    ++table_mapping.count;
 
     // Calculate fixed_size and var_cnt; maintain table mapping info
     std::size_t fixed_size = /* null bitmap */ (field_list.size() + 7) / 8;
@@ -317,6 +396,19 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
     }
     table_info.fixed_size = fixed_size;
     table_info.var_cnt = var_cnt;
+
+    table_info.primary_field_count = 0;
+    for (const auto &f: primary_field_list) {
+        add_primary_key(table_mapping.count, f);
+    }
+
+    table_info.foreign_field_count = 0;
+    for (const auto &f: foreign_field_list) {
+        add_foreign_key(table_mapping.count, f);
+    }
+    table_info.related_table_count = 0;
+
+    ++table_mapping.count;
     update_table_mapping_file(current_db.id);
 
     // Create record file
@@ -415,6 +507,66 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
     frontend->ok(0);
 }
 
+void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryField &primary_restriction) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    add_primary_key(table_loc, primary_restriction);
+    frontend->ok(0);
+}
+
+void ManageSystem::drop_primary_key(const std::string &table_name, const std::string &restriction_name) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    if (restriction_name.empty()) {
+        info.primary_field_count = 0;
+    } else {
+        std::size_t restriction_loc = 0;
+        while (restriction_loc < info.primary_field_count) {
+            if (info.primary_fields[restriction_loc].restriction_name == restriction_name) {
+                break;
+            }
+            ++restriction_loc;
+        }
+        if (restriction_loc == info.primary_field_count) {
+            frontend->error("Primary key restriction of name " + restriction_name + " does not exist.");
+            return;
+        }
+        --info.primary_field_count;
+        while (restriction_loc < info.primary_field_count) {
+            info.primary_fields[restriction_loc] = info.primary_fields[restriction_loc + 1];
+            ++restriction_loc;
+        }
+    }
+    frontend->ok(0);
+}
+
+void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignField &foreign_restriction) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    add_foreign_key(table_loc, foreign_restriction);
+    frontend->ok(0);
+}
+
+void ManageSystem::drop_foreign_key(const std::string &table_name, const std::string &restriction_name) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    std::size_t restriction_loc = 0;
+    while (restriction_loc < info.foreign_field_count) {
+        if (info.foreign_fields[restriction_loc].restriction_name == restriction_name) {
+            break;
+        }
+        ++restriction_loc;
+    }
+    if (restriction_loc == info.foreign_field_count) {
+        frontend->error("Foreign key restriction of name " + restriction_name + " does not exist.");
+        return;
+    }
+    --info.foreign_field_count;
+    while (restriction_loc < info.foreign_field_count) {
+        info.foreign_fields[restriction_loc] = info.foreign_fields[restriction_loc + 1];
+        ++restriction_loc;
+    }
+    frontend->ok(0);
+}
+
 Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {
     using namespace Error;
 
@@ -424,6 +576,7 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
         return VALUE_COUNT_MISMATCH;
     }
 
+    // Basic validation
     for (std::size_t i = 0; i < info.field_count; ++i) {
         if (!(values[i].type == Value::NUL
               || info.fields[i].type == Field::STR && values[i].type == Value::STR
@@ -440,6 +593,51 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
             return STR_TOO_LONG;
         }
     }
+
+    // Primary key restriction
+    auto record_file = get_record_file(table_name);
+    std::size_t length_limit = get_record_length_limit(table_name);
+    auto buffer = new char[length_limit + 5];
+    for (std::size_t i = 0; i < info.primary_field_count; ++i) {
+        auto &f = info.primary_fields[i];
+        std::vector<std::size_t> restricted;
+        for (std::size_t c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                restricted.push_back(c);
+            }
+        }
+
+        for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
+            std::size_t length = record_file->get_record(rid, buffer);
+            auto record = from_bytes_to_record(table_name, buffer, length);
+            bool match = true;
+            for (const auto &c: restricted) {
+                if (record[c] != values[c]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) {
+                delete[] buffer;
+                return PRIMARY_RESTRICTION_FAIL;
+            }
+        }
+    }
+
+    // Foreign key restriction
+    for (std::size_t i = 0; i < info.foreign_field_count; ++i) {
+        auto &f = info.foreign_fields[i];
+        std::vector<std::size_t> restricted;
+        for (std::size_t c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                restricted.push_back(c);
+            }
+        }
+
+        // TODO
+    }
+
+    delete[] buffer;
     return NONE;
 }
 
