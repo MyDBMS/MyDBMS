@@ -124,4 +124,6 @@ public:
     IndexFile *get_index_file(const std::string &table_name, const std::string &column_name);
 
     std::size_t get_record_length_limit(const std::string &table_name);
+
+    std::size_t get_column_num(const std::string &table_name);
 };

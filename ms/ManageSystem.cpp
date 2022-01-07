@@ -619,3 +619,9 @@ std::size_t ManageSystem::get_record_length_limit(const std::string &table_name)
     }
     return length;
 }
+
+std::size_t ManageSystem::get_column_num(const std::string &table_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    return info.field_count;
+}
