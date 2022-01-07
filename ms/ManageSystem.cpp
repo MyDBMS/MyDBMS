@@ -137,6 +137,8 @@ void ManageSystem::create_db(const std::string &db_name) {
         std::filesystem::remove_all(db_directory);
     }
     std::filesystem::create_directory(db_directory);
+
+    frontend->ok(1);
 }
 
 void ManageSystem::drop_db(const std::string &db_name) {
@@ -175,6 +177,8 @@ void ManageSystem::drop_db(const std::string &db_name) {
         ++idx;
     }
     update_db_mapping_file();
+
+    frontend->ok(1);
 }
 
 void ManageSystem::show_dbs() {
@@ -220,6 +224,8 @@ void ManageSystem::use_db(const std::string &db_name) {
         frontend->error("DB of name " + db_name + " does not exist.");
         return;
     }
+
+    frontend->info("Database changed.");
 }
 
 void ManageSystem::create_table(const std::string &table_name, const std::vector<Field> &field_list) {
@@ -297,6 +303,8 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
     std::filesystem::path file_path = current_db.dir;
     file_path.append(std::to_string(table_id) + ".txt");
     rs.create_file(file_path.c_str(), fixed_size, var_cnt);
+
+    frontend->ok(0);
 }
 
 void ManageSystem::drop_table(const std::string &table_name) {
@@ -325,6 +333,8 @@ void ManageSystem::drop_table(const std::string &table_name) {
         ++table_id;
     }
     update_table_mapping_file(current_db.id);
+
+    frontend->ok(0);
 }
 
 void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {
@@ -348,6 +358,8 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
     is.create_file(index_file_path.c_str());
     field.indexed = true;
     update_table_mapping_file(current_db.id);
+
+    frontend->ok(0);
 }
 
 void ManageSystem::drop_index(const std::string &table_name, const std::vector<std::string> &column_list) {
@@ -371,6 +383,8 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
     IndexSystem::remove_file(index_file_path.c_str());
     field.indexed = false;
     update_table_mapping_file(current_db.id);
+
+    frontend->ok(0);
 }
 
 Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {

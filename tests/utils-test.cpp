@@ -1,8 +1,8 @@
 #include "../utils/Frontend.h"
 
 void test_frontend() {
-    std::strstream ss;
-    auto frontend = StrStreamFrontend(ss);
+    std::stringstream ss;
+    auto frontend = StringStreamFrontend(ss);
     Frontend::Table table;
     table.push_back({"abc", {"123", "45"}});
     table.push_back({"def233", {"666", "long long long"}});

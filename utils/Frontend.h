@@ -1,7 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include <strstream>
+#include <sstream>
 #include <vector>
 #include "../ms/Value.h"
 
@@ -20,6 +20,10 @@ public:
 
     void print_table(const Table &table) const;
 
+    void ok(int row_cnt) const;
+
+    void info(const std::string &msg) const;
+
     void error(const std::string &msg) const;
 
     void warning(const std::string &msg) const;
@@ -29,11 +33,11 @@ class StdioFrontend : public Frontend {
     void print_string(const std::string &s) const override;
 };
 
-class StrStreamFrontend : public Frontend {
-    std::strstream &stream;
+class StringStreamFrontend : public Frontend {
+    std::stringstream &stream;
 
     void print_string(const std::string &s) const override;
 
 public:
-    explicit StrStreamFrontend(std::strstream &stream);
+    explicit StringStreamFrontend(std::stringstream &stream);
 };

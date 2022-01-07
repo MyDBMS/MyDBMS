@@ -55,8 +55,8 @@ void test_value() {
 }
 
 void test_ms() {
-    std::strstream ss;
-    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StrStreamFrontend(ss));
+    std::stringstream ss;
+    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StringStreamFrontend(ss));
     ms.create_db(DB_NAME);
     ms.use_db(DB_NAME);
 
@@ -166,6 +166,7 @@ void test_ms() {
     }
 
     {
+        ss.str("");
         ms.show_dbs();
         ms.show_tables();
         std::string expected = R"(+----------+

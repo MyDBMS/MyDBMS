@@ -54,25 +54,35 @@ void Frontend::print_table(const Frontend::Table &table) const {
     print_string(std::to_string(row_count) + " row" + (row_count == 1 ? "" : "s") + " in set\n");
 }
 
-void Frontend::error(const std::string &msg) const {
-    print_string("[ERROR] ");
+void Frontend::ok(int row_cnt) const {
+    info("Query OK, " + std::to_string(row_cnt) + " row" + (row_cnt == 1 ? "" : "s") + " affected.\n");
+}
+
+void Frontend::info(const std::string &msg) const {
+    print_string("\x1b[34m[INFO] ");
     print_string(msg);
-    print_string("\n");
+    print_string("\x1b[0m\n");
+}
+
+void Frontend::error(const std::string &msg) const {
+    print_string("\x1b[31m[ERROR] ");
+    print_string(msg);
+    print_string("\x1b[0m\n");
 }
 
 void Frontend::warning(const std::string &msg) const {
-    print_string("[WARNING] ");
+    print_string("\x1b[33m[WARNING] ");
     print_string(msg);
-    print_string("\n");
+    print_string("\x1b[0m\n");
 }
 
 void StdioFrontend::print_string(const std::string &s) const {
     std::cout << s;
 }
 
-void StrStreamFrontend::print_string(const std::string &s) const {
+void StringStreamFrontend::print_string(const std::string &s) const {
     stream << s;
 }
 
-StrStreamFrontend::StrStreamFrontend(std::strstream &stream) : stream(stream) {
+StringStreamFrontend::StringStreamFrontend(std::stringstream &stream) : stream(stream) {
 }
