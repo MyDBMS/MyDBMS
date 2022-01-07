@@ -22,6 +22,7 @@ struct TableMapping {
             Field::Type type{};
             std::size_t str_len{};
             bool nullable{};
+            bool indexed{};
         } fields[MAX_COLUMN_COUNT];
     } mapping[MAX_TABLE_COUNT]{};
 };

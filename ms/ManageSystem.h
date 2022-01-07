@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include "../rs/RecordSystem.h"
+#include "../is/IndexSystem.h"
 #include "DatabaseMapping.h"
 #include "TableMapping.h"
 #include "Field.h"
@@ -51,6 +52,8 @@ class ManageSystem {
 
     RecordSystem rs;
 
+    IndexSystem is;
+
     explicit ManageSystem(const std::string &root_dir);
 
     void load_db_mapping_file();
@@ -62,6 +65,10 @@ class ManageSystem {
     void update_table_mapping_file(std::size_t db_id);
 
     std::size_t find_table_by_name(const std::string &table_name);
+
+    std::size_t find_column_by_name(std::size_t table_loc, const std::string &column_name);
+
+    std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
     static void issue();
 
@@ -79,17 +86,27 @@ public:
 
     void drop_table(const std::string &table_name);
 
+    void create_index(const std::string &table_name, const std::vector<std::string> &column_list);
+
+    void drop_index(const std::string &table_name, const std::vector<std::string> &column_list);
+
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 
     char *from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, std::size_t &length);
 
     std::vector<Value> from_bytes_to_record(const std::string &table_name, char *buffer, std::size_t length);
 
+    std::vector<std::size_t> get_index_ids(const std::string &table_name);
+
+    bool is_index_exist(const std::string &table_name, const std::string &column_name);
+
     std::string get_column_name(const std::string &table_name, std::size_t column_id);
 
     bool is_table_exist(const std::string &table_name);
 
     RecordFile *get_record_file(const std::string &table_name);
+
+    IndexFile *get_index_file(const std::string &table_name, const std::string &column_name);
 
     std::size_t get_record_length_limit(const std::string &table_name);
 };

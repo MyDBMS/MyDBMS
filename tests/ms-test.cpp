@@ -127,6 +127,24 @@ void test_ms() {
         assert(record[2].asInt() == 6);
     }
 
+    // test indexing
+    {
+        std::vector<std::string> column_list{"c"};
+        ms.create_index(TABLE_NAME, column_list);
+
+        auto indices = ms.get_index_ids(TABLE_NAME);
+        assert(indices.size() == 1);
+        assert(indices[0] == 2);
+
+        assert(ms.is_index_exist(TABLE_NAME, "a") == false);
+        assert(ms.is_index_exist(TABLE_NAME, "c") == true);
+
+        auto index_file = ms.get_index_file(TABLE_NAME, "c");
+        index_file->close();
+
+        ms.drop_index(TABLE_NAME, column_list);
+    }
+
     // test getting record file
     {
         char record[14] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 14, 0, '2', '3', '3'};

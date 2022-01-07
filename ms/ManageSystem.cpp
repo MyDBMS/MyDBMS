@@ -58,6 +58,23 @@ std::size_t ManageSystem::find_table_by_name(const std::string &table_name) {
     assert(false);
 }
 
+std::size_t ManageSystem::find_column_by_name(std::size_t table_loc, const std::string &column_name) {
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if (info.fields[i].column_name == column_name) {
+            return i;
+        }
+    }
+
+    assert(false);
+}
+
+std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t column_id) {
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    assert(column_id >= 0 && column_id < info.field_count);
+    return info.fields[column_id].column_name;
+}
+
 ManageSystem ManageSystem::load_system(const std::string &root_dir) {
     ManageSystem ms(root_dir);
 
@@ -236,6 +253,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 table_info_field.type = Field::STR;
                 table_info_field.str_len = f.str_len;
                 table_info_field.nullable = f.nullable;
+                table_info_field.indexed = false;
                 break;
             case Field::INT:
                 fixed_size += 4;
@@ -244,6 +262,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 table_info_field.type = Field::INT;
                 table_info_field.str_len = 0;
                 table_info_field.nullable = f.nullable;
+                table_info_field.indexed = false;
                 break;
             default:
                 break;
@@ -270,12 +289,67 @@ void ManageSystem::drop_table(const std::string &table_name) {
     file_path.append(std::to_string(info.id) + ".txt");
     RecordSystem::remove_file(file_path.c_str());
 
+    // Remove index files
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if (info.fields[i].indexed) {
+            auto index_file_path = current_db.dir;
+            index_file_path.append("idx_" + std::to_string(info.id) + "_" + info.fields[i].column_name + ".txt");
+            IndexSystem::remove_file(index_file_path.c_str());
+        }
+    }
+
     // Remove table from table mapping info
     --table_mapping_map[current_db.id].count;
     while (table_id < table_mapping_map[current_db.id].count) {
         mapping[table_id] = mapping[table_id + 1];
         ++table_id;
     }
+    update_table_mapping_file(current_db.id);
+}
+
+void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+
+    if (column_list.size() != 1) {
+        issue();
+        return;
+    }
+
+    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    auto &field = info.fields[column_id];
+    if (field.indexed) {
+        issue();
+        return;
+    }
+
+    auto index_file_path = current_db.dir;
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
+    is.create_file(index_file_path.c_str());
+    field.indexed = true;
+    update_table_mapping_file(current_db.id);
+}
+
+void ManageSystem::drop_index(const std::string &table_name, const std::vector<std::string> &column_list) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+
+    if (column_list.size() != 1) {
+        issue();
+        return;
+    }
+
+    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    auto &field = info.fields[column_id];
+    if (!field.indexed) {
+        issue();
+        return;
+    }
+
+    auto index_file_path = current_db.dir;
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
+    IndexSystem::remove_file(index_file_path.c_str());
+    field.indexed = false;
     update_table_mapping_file(current_db.id);
 }
 
@@ -427,10 +501,28 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
     return result;
 }
 
-std::string ManageSystem::get_column_name(const std::string &table_name, std::size_t column_id) {
+std::vector<std::size_t> ManageSystem::get_index_ids(const std::string &table_name) {
+    std::vector<std::size_t> result;
     std::size_t table_id = find_table_by_name(table_name);
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
-    return info.fields[column_id].column_name;
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if (info.fields[i].indexed) {
+            result.push_back(i);
+        }
+    }
+    return result;
+}
+
+bool ManageSystem::is_index_exist(const std::string &table_name, const std::string &column_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    std::size_t column_id = find_column_by_name(table_id, column_name);
+    return info.fields[column_id].indexed;
+}
+
+std::string ManageSystem::get_column_name(const std::string &table_name, std::size_t column_id) {
+    std::size_t table_id = find_table_by_name(table_name);
+    return find_column_by_id(table_id, column_id);
 }
 
 bool ManageSystem::is_table_exist(const std::string &table_name) {
@@ -452,6 +544,16 @@ RecordFile *ManageSystem::get_record_file(const std::string &table_name) {
     auto file_path = current_db.dir;
     file_path.append(std::to_string(info.id) + ".txt");
     return rs.open_file(file_path.c_str());
+}
+
+IndexFile *ManageSystem::get_index_file(const std::string &table_name, const std::string &column_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    auto index_file_path = current_db.dir;
+    std::size_t column_id = find_column_by_name(table_id, column_name);
+    assert(info.fields[column_id].indexed);
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + info.fields[column_id].column_name + ".txt");
+    return is.open_file(index_file_path.c_str());
 }
 
 std::size_t ManageSystem::get_record_length_limit(const std::string &table_name) {
