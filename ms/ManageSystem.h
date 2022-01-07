@@ -51,6 +51,16 @@ class ManageSystem {
         std::filesystem::path dir;  // 目录
     } current_db;
 
+    /**
+     * 保存已经打开的记录文件。
+     */
+    std::map<std::string, RecordFile *> record_files;
+
+    /**
+     * 保存已经打开的索引文件。
+     */
+    std::map<std::string, IndexFile *> index_files;
+
     RecordSystem rs;
 
     IndexSystem is;
