@@ -28,61 +28,81 @@ void Frontend::print_table(const Frontend::Table &table) const {
     separator += "\n";
 
     // Print header
-    print_string(separator);
-    print_string("|");
+    write_string(separator);
+    write_string("|");
     for (std::size_t i = 0; i < table.size(); ++i) {
-        print_string(pad(table[i].name, max_value_width[i]));
-        print_string("|");
+        write_string(pad(table[i].name, max_value_width[i]));
+        write_string("|");
     }
-    print_string("\n");
-    print_string(separator);
+    write_string("\n");
+    write_string(separator);
 
     // Print body
     for (std::size_t r = 0; r < row_count; ++r) {
-        print_string("|");
+        write_string("|");
         for (std::size_t i = 0; i < table.size(); ++i) {
-            print_string(pad(table[i].values[r], max_value_width[i]));
-            print_string("|");
+            write_string(pad(table[i].values[r], max_value_width[i]));
+            write_string("|");
         }
-        print_string("\n");
+        write_string("\n");
     }
     if (row_count > 0) {
-        print_string(separator);
+        write_string(separator);
     }
 
     // Print footer
-    print_string(std::to_string(row_count) + " row" + (row_count == 1 ? "" : "s") + " in set\n");
+    write_string(std::to_string(row_count) + " row" + (row_count == 1 ? "" : "s") + " in set\n");
 }
 
 void Frontend::ok(int row_cnt) const {
-    info("Query OK, " + std::to_string(row_cnt) + " row" + (row_cnt == 1 ? "" : "s") + " affected.\n");
+    info("Query OK, " + std::to_string(row_cnt) + " row" + (row_cnt == 1 ? "" : "s") + " affected.");
 }
 
 void Frontend::info(const std::string &msg) const {
-    print_string("\x1b[34m[INFO] ");
-    print_string(msg);
-    print_string("\x1b[0m\n");
+    write_string("\x1b[34m[INFO] ");
+    write_string(msg);
+    write_string("\x1b[0m\n");
 }
 
 void Frontend::error(const std::string &msg) const {
-    print_string("\x1b[31m[ERROR] ");
-    print_string(msg);
-    print_string("\x1b[0m\n");
+    write_string("\x1b[31m[ERROR] ");
+    write_string(msg);
+    write_string("\x1b[0m\n");
 }
 
 void Frontend::warning(const std::string &msg) const {
-    print_string("\x1b[33m[WARNING] ");
-    print_string(msg);
-    print_string("\x1b[0m\n");
+    write_string("\x1b[33m[WARNING] ");
+    write_string(msg);
+    write_string("\x1b[0m\n");
 }
 
-void StdioFrontend::print_string(const std::string &s) const {
+void StdioFrontend::write_string(const std::string &s) const {
     std::cout << s;
 }
 
-void StringStreamFrontend::print_string(const std::string &s) const {
-    stream << s;
+std::string StdioFrontend::read_stmt() {
+    char ch;
+    std::string s;
+    while (true) {
+        ch = (char) std::cin.get();
+        if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
+        if (ch == ';') return s;
+    }
 }
 
-StringStreamFrontend::StringStreamFrontend(std::stringstream &stream) : stream(stream) {
+void StringStreamFrontend::write_string(const std::string &s) const {
+    ostream << s;
+}
+
+StringStreamFrontend::StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream)
+        : istream(istream), ostream(ostream) {}
+
+std::string StringStreamFrontend::read_stmt() {
+    char ch;
+    std::string s;
+    while (true) {
+        ch = (char) istream.get();
+        if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
+        if (ch == ';') return s;
+    }
 }

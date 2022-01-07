@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(UTILS_SRC utils/Error.h utils/Frontend.cpp utils/Frontend.h)
+set(UTILS_SRC utils/Error.h utils/Frontend.cpp utils/Frontend.h utils/Application.cpp utils/Application.h)
 
 set(FS_SRC fs/Filesystem.cpp fs/Filesystem.h fs/File.cpp fs/File.h fs/BufferManager.cpp fs/BufferManager.h fs/BufferPage.cpp fs/BufferPage.h)
 
@@ -57,11 +57,13 @@ add_library (antlr4-cpp-runtime ${antlr4-cpp-src})
 add_executable(my_dbms ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${QS_SRC} ${MS_SRC} ${GR_SRC} src/main.cpp)
 target_link_libraries(my_dbms antlr4-cpp-runtime)
 
-add_executable(utils-test tests/utils-test.cpp ${UTILS_SRC})
-add_executable(fs-test tests/fs-test.cpp ${UTILS_SRC} ${FS_SRC})
-add_executable(rs-test tests/rs-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC})
-add_executable(is-test tests/is-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC})
-add_executable(ms-test tests/ms-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${MS_SRC})
+add_executable(utils-test tests/utils-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${QS_SRC} ${MS_SRC} ${GR_SRC})
+add_executable(fs-test tests/fs-test.cpp ${FS_SRC})
+add_executable(rs-test tests/rs-test.cpp ${FS_SRC} ${RS_SRC})
+add_executable(is-test tests/is-test.cpp ${FS_SRC} ${RS_SRC} ${IS_SRC})
+add_executable(ms-test tests/ms-test.cpp ${UTILS_SRC} ${FS_SRC} ${RS_SRC} ${IS_SRC} ${QS_SRC} ${MS_SRC} ${GR_SRC})
+target_link_libraries(utils-test antlr4-cpp-runtime)
+target_link_libraries(ms-test antlr4-cpp-runtime)
 
 add_test(test-utils ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/utils-test)
 add_test(test-fs ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fs-test)

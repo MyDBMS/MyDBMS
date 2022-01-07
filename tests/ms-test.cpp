@@ -55,8 +55,8 @@ void test_value() {
 }
 
 void test_ms() {
-    std::stringstream ss;
-    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StringStreamFrontend(ss));
+    std::stringstream iss, oss;
+    ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StringStreamFrontend(iss, oss));
     ms.create_db(DB_NAME);
     ms.use_db(DB_NAME);
 
@@ -166,7 +166,7 @@ void test_ms() {
     }
 
     {
-        ss.str("");
+        oss.str("");
         ms.show_dbs();
         ms.show_tables();
         std::string expected = R"(+----------+
@@ -182,7 +182,7 @@ void test_ms() {
 +-------------------+
 1 row in set
 )";
-        assert(ss.str() == expected);
+        assert(oss.str() == expected);
     }
 
     // Test api related to dropping

@@ -6,7 +6,9 @@
 #include "../ms/Value.h"
 
 class Frontend {
-    virtual void print_string(const std::string &s) const = 0;
+    virtual void write_string(const std::string &s) const = 0;
+
+    virtual std::string read_stmt() = 0;
 
     static std::string pad(const std::string &s, std::size_t max_width);
 
@@ -30,14 +32,21 @@ public:
 };
 
 class StdioFrontend : public Frontend {
-    void print_string(const std::string &s) const override;
+    friend class Application;
+
+    void write_string(const std::string &s) const override;
+
+    std::string read_stmt() override;
 };
 
 class StringStreamFrontend : public Frontend {
-    std::stringstream &stream;
+    std::stringstream &istream;
+    std::stringstream &ostream;
 
-    void print_string(const std::string &s) const override;
+    void write_string(const std::string &s) const override;
+
+    std::string read_stmt() override;
 
 public:
-    explicit StringStreamFrontend(std::stringstream &stream);
+    explicit StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream);
 };

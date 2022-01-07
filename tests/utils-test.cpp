@@ -1,8 +1,8 @@
 #include "../utils/Frontend.h"
 
 void test_frontend() {
-    std::stringstream ss;
-    auto frontend = StringStreamFrontend(ss);
+    std::stringstream iss, oss;
+    auto frontend = StringStreamFrontend(iss, oss);
     Frontend::Table table;
     table.push_back({"abc", {"123", "45"}});
     table.push_back({"def233", {"666", "long long long"}});
@@ -15,7 +15,7 @@ void test_frontend() {
 +-----+----------------+
 2 rows in set
 )";
-    assert(ss.str() == expected);
+    assert(oss.str() == expected);
 }
 
 int main() {
