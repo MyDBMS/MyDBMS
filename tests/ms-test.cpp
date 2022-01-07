@@ -27,6 +27,16 @@ void test_value() {
     }
 
     {
+        // Test float value
+        Value v1 = Value::make_value(1.0f);
+        Value v2 = Value::make_value(2.0f);
+        Value v3 = v1;
+        assert(v1.asFloat() == 1.0f);
+        assert(v2.asFloat() == 2.0f);
+        assert(v3.asFloat() == 1.0f);
+    }
+
+    {
         // Test null value
         Value v1 = Value::make_value();
         Value v2 = Value::make_value();
@@ -83,6 +93,7 @@ void test_ms() {
         values.push_back(Value::make_value(3));
         values.push_back(Value::make_value("233"));
         values.push_back(Value::make_value(6));
+        values.push_back(Value::make_value(8.0f));
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::NONE);
     }
 
@@ -98,6 +109,7 @@ void test_ms() {
         values.push_back(Value::make_value("666"));
         values.push_back(Value::make_value("233"));
         values.push_back(Value::make_value(6));
+        values.push_back(Value::make_value(8.0f));
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::TYPE_MISMATCH);
     }
 
@@ -106,6 +118,7 @@ void test_ms() {
         values.push_back(Value::make_value(3));
         values.push_back(Value::make_value("233666"));
         values.push_back(Value::make_value(6));
+        values.push_back(Value::make_value(8.0f));
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::STR_TOO_LONG);
     }
 
@@ -114,7 +127,18 @@ void test_ms() {
         values.push_back(Value::make_value(3));
         values.push_back(Value::make_value("233"));
         values.push_back(Value::make_value());
+        values.push_back(Value::make_value(8.0f));
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::FIELD_CANNOT_BE_NULL);
+    }
+
+    // test comparison
+    {
+        assert(Value::make_value() == Value::make_value());
+        assert(Value::make_value() != Value::make_value(233));
+        assert(Value::make_value(42) == Value::make_value(42));
+        assert(Value::make_value(80) > Value::make_value(42));
+        assert(Value::make_value(12) < Value::make_value(42));
+        assert(Value::make_value("xyz") != Value::make_value("abc"));
     }
 
     // convert between record and bytes
@@ -123,20 +147,22 @@ void test_ms() {
         values.push_back(Value::make_value(3));
         values.push_back(Value::make_value("233"));
         values.push_back(Value::make_value(6));
+        values.push_back(Value::make_value(0.0f));
         std::size_t l;
         auto received = ms.from_record_to_bytes(TABLE_NAME, values, l);
-        assert(l == 14);
-        const char expected[14] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 14, 0, '2', '3', '3'};
-        assert(memcmp(received, expected, 14) == 0);
+        assert(l == 18);
+        const char expected[18] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 18, 0, '2', '3', '3'};
+        assert(memcmp(received, expected, 18) == 0);
     }
 
     {
-        char bytes[14] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 14, 0, '2', '3', '3'};
-        auto record = ms.from_bytes_to_record(TABLE_NAME, bytes, 14);
-        assert(record.size() == 3);
+        char bytes[18] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 18, 0, '2', '3', '3'};
+        auto record = ms.from_bytes_to_record(TABLE_NAME, bytes, 18);
+        assert(record.size() == 4);
         assert(record[0].asInt() == 3);
         assert(record[1].asString() == "233");
         assert(record[2].asInt() == 6);
+        assert(record[3].asFloat() == 0);
     }
 
     // test indexing
@@ -159,9 +185,9 @@ void test_ms() {
 
     // test getting record file
     {
-        char record[14] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 14, 0, '2', '3', '3'};
+        char record[18] = {0, 3, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 18, 0, '2', '3', '3'};
         auto record_file = ms.get_record_file(TABLE_NAME);
-        assert(record_file->insert_record(14, record).page_id == 2);
+        assert(record_file->insert_record(18, record).page_id == 2);
     }
 
     // test other api
@@ -173,7 +199,7 @@ void test_ms() {
         assert(ms.is_table_exist(TABLE_NAME) == true);
         assert(ms.is_table_exist("xyz") == false);
 
-        assert(ms.get_record_length_limit(TABLE_NAME) == 16);
+        assert(ms.get_record_length_limit(TABLE_NAME) == 20);
     }
 
     {

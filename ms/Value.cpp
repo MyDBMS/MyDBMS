@@ -11,6 +11,9 @@ Value::Value(const std::string &val)
     strcpy((char *) data, val.c_str());
 }
 
+Value::Value(float val)
+        : data{(void *) new float(val)}, str_len{0}, type{FLOAT} {}
+
 int Value::asInt() const {
     if (type == NUL) return 0;
     assert(type == INT);
@@ -21,6 +24,12 @@ std::string Value::asString() const {
     if (type == NUL) return "";
     assert(type == STR);
     return (char *) data;
+}
+
+float Value::asFloat() const {
+    if (type == NUL) return 0;
+    assert(type == FLOAT);
+    return *(float *) data;
 }
 
 bool Value::isNull() const {
@@ -39,6 +48,10 @@ Value Value::make_value(const std::string &value) {
     return Value(value);
 }
 
+Value Value::make_value(float value) {
+    return Value(value);
+}
+
 Value::Value(const Value &rhs) : str_len(rhs.str_len), type(rhs.type) {
     switch (rhs.type) {
         case NUL:
@@ -51,8 +64,51 @@ Value::Value(const Value &rhs) : str_len(rhs.str_len), type(rhs.type) {
         case INT:
             data = (void *) new int(*(int *) rhs.data);
             break;
+        case FLOAT:
+            data = (void *) new float(*(float *) rhs.data);
+            break;
         default:
             assert(false);
+    }
+}
+
+std::partial_ordering Value::operator<=>(const Value &rhs) const {
+    if (type == NUL && rhs.type == NUL) {
+        return std::partial_ordering::equivalent;
+    } else if (type == NUL || rhs.type == NUL) {
+        return std::partial_ordering::unordered;
+    } else {
+        assert(type == rhs.type);
+        switch (type) {
+            case STR:
+                return std::string((char *) data) <=> std::string((char *) rhs.data);
+            case INT:
+                return *(int *) data <=> *(int *) rhs.data;
+            case FLOAT:
+                return *(float *) data <=> *(float *) rhs.data;
+            default:
+                assert(false);
+        }
+    }
+}
+
+bool Value::operator==(const Value &rhs) const {
+    if (type == NUL && rhs.type == NUL) {
+        return true;
+    } else if (type == NUL || rhs.type == NUL) {
+        return false;
+    } else {
+        assert(type == rhs.type);
+        switch (type) {
+            case STR:
+                return std::string((char *) data) == std::string((char *) rhs.data);
+            case INT:
+                return *(int *) data == *(int *) rhs.data;
+            case FLOAT:
+                return *(float *) data == *(float *) rhs.data;
+            default:
+                assert(false);
+        }
     }
 }
 
@@ -85,6 +141,9 @@ Value::~Value() {
             break;
         case INT:
             delete (int *) data;
+            break;
+        case FLOAT:
+            delete (float *) data;
             break;
         default:
             assert(false);

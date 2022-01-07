@@ -285,16 +285,25 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 var_cnt += 1;
                 table_info_field.type = Field::STR;
                 table_info_field.str_len = f.str_len;
-                table_info_field.nullable = f.nullable;
-                table_info_field.indexed = false;
+                strcpy(table_info_field.def_str, f.def_str.c_str());
+                if (f.def_str.length() > MAX_DEFAULT_STR_LEN) {
+                    frontend->warning("Default string of field " + f.name + " is over long!");
+                    break;
+                }
                 break;
             case Field::INT:
                 fixed_size += 4;
                 var_cnt += 0;
                 table_info_field.type = Field::INT;
                 table_info_field.str_len = 0;
-                table_info_field.nullable = f.nullable;
-                table_info_field.indexed = false;
+                table_info_field.def_int = f.def_int;
+                break;
+            case Field::FLOAT:
+                fixed_size += 4;
+                var_cnt += 0;
+                table_info_field.type = Field::FLOAT;
+                table_info_field.str_len = 0;
+                table_info_field.def_float = f.def_float;
                 break;
             default:
                 break;
@@ -418,6 +427,7 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
     for (std::size_t i = 0; i < info.field_count; ++i) {
         if (!(values[i].type == Value::NUL
               || info.fields[i].type == Field::STR && values[i].type == Value::STR
+              || info.fields[i].type == Field::FLOAT && values[i].type == Value::FLOAT
               || info.fields[i].type == Field::INT && values[i].type == Value::INT)) {
             return TYPE_MISMATCH;
         }
@@ -448,6 +458,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
                         l += 0;
                         break;
                     case Field::INT:
+                    case Field::FLOAT:
                         l += 4;
                         break;
                     default:
@@ -458,6 +469,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
                 l += 2 + (v.asString().length());
                 break;
             case Value::INT:
+            case Value::FLOAT:
                 l += 4;
                 break;
             default:
@@ -486,6 +498,9 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
                 case Field::INT:
                     actual_type = Value::INT;
                     break;
+                case Field::FLOAT:
+                    actual_type = Value::FLOAT;
+                    break;
                 default:
                     assert(false);
             }
@@ -501,6 +516,10 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
                 break;
             case Value::INT:
                 *(int *) (buffer + fixed_pos) = v.asInt();
+                fixed_pos += 4;
+                break;
+            case Value::FLOAT:
+                *(float *) (buffer + fixed_pos) = v.asFloat();
                 fixed_pos += 4;
                 break;
             default:
@@ -542,6 +561,12 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
             }
             case Field::INT: {
                 int value = *(int *) (buffer + fixed_pos);
+                fixed_pos += 4;
+                result.push_back(Value::make_value(value));
+                break;
+            }
+            case Field::FLOAT: {
+                float value = *(float *) (buffer + fixed_pos);
                 fixed_pos += 4;
                 result.push_back(Value::make_value(value));
                 break;
@@ -643,6 +668,7 @@ std::size_t ManageSystem::get_record_length_limit(const std::string &table_name)
                 length += 2 + f.str_len;
                 break;
             case Field::INT:
+            case Field::FLOAT:
                 length += 4;
                 break;
             default:

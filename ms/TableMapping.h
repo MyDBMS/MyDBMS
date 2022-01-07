@@ -7,6 +7,7 @@
 #define MAX_TABLE_NAME_LEN 10
 #define MAX_COLUMN_COUNT 10
 #define MAX_COLUMN_NAME_LEN 10
+#define MAX_DEFAULT_STR_LEN 10
 
 struct TableMapping {
     std::size_t db_id{};
@@ -23,6 +24,9 @@ struct TableMapping {
             std::size_t str_len{};
             bool nullable{};
             bool indexed{};
+            int def_int{};
+            float def_float{};
+            char def_str[MAX_DEFAULT_STR_LEN + 1]{};
         } fields[MAX_COLUMN_COUNT];
     } mapping[MAX_TABLE_COUNT]{};
 };
