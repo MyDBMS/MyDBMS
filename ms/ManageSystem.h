@@ -65,8 +65,6 @@ class ManageSystem {
 
     IndexSystem is;
 
-    const Frontend *frontend;
-
     explicit ManageSystem(const std::string &root_dir, const Frontend *frontend);
 
     void load_db_mapping_file();
@@ -84,6 +82,8 @@ class ManageSystem {
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
 public:
+
+    const Frontend *frontend;
 
     static ManageSystem load_system(const std::string &root_dir, const Frontend *frontend);
 
