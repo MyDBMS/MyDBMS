@@ -578,7 +578,7 @@ RecordFile *ManageSystem::get_record_file(const std::string &table_name) {
     auto file_path = current_db.dir;
     file_path.append(std::to_string(info.id) + ".txt");
     auto f = record_files.find(file_path);
-    return f != record_files.end() ? f->second : rs.open_file(file_path.c_str());
+    return f != record_files.end() ? f->second : record_files[file_path] = rs.open_file(file_path.c_str());
 }
 
 IndexFile *ManageSystem::get_index_file(const std::string &table_name, const std::string &column_name) {
@@ -589,7 +589,7 @@ IndexFile *ManageSystem::get_index_file(const std::string &table_name, const std
     assert(info.fields[column_id].indexed);
     index_file_path.append("idx_" + std::to_string(info.id) + "_" + info.fields[column_id].column_name + ".txt");
     auto f = index_files.find(index_file_path);
-    return f != index_files.end() ? f->second : is.open_file(index_file_path.c_str());
+    return f != index_files.end() ? f->second : index_files[index_file_path] = is.open_file(index_file_path.c_str());
 }
 
 std::size_t ManageSystem::get_record_length_limit(const std::string &table_name) {
