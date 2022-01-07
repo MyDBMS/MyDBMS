@@ -54,6 +54,18 @@ void Frontend::print_table(const Frontend::Table &table) const {
     print_string(std::to_string(row_count) + " row" + (row_count == 1 ? "" : "s") + " in set\n");
 }
 
+void Frontend::error(const std::string &msg) const {
+    print_string("[ERROR] ");
+    print_string(msg);
+    print_string("\n");
+}
+
+void Frontend::warning(const std::string &msg) const {
+    print_string("[WARNING] ");
+    print_string(msg);
+    print_string("\n");
+}
+
 void StdioFrontend::print_string(const std::string &s) const {
     std::cout << s;
 }

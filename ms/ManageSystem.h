@@ -73,8 +73,6 @@ class ManageSystem {
 
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
-    static void issue();
-
 public:
 
     static ManageSystem load_system(const std::string &root_dir, const Frontend *frontend);

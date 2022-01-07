@@ -98,18 +98,14 @@ ManageSystem ManageSystem::load_system(const std::string &root_dir, const Fronte
     return ms;
 }
 
-void ManageSystem::issue() {
-
-}
-
 void ManageSystem::create_db(const std::string &db_name) {
     if (db_name.empty() || db_name.length() > MAX_DB_NAME_LEN) {
-        issue();
+        frontend->error("DB name shall be neither empty nor longer than " + std::to_string(MAX_DB_NAME_LEN) + ".");
         return;
     }
 
     if (db_mapping.count + 1 >= MAX_DB_COUNT) {
-        issue();
+        frontend->error("No more DB! You promised!");
         return;
     }
 
@@ -120,7 +116,7 @@ void ManageSystem::create_db(const std::string &db_name) {
             current_id_max = db_mapping.mapping[i].id;
         }
         if (strcmp(db_mapping.mapping[i].name, db_name.c_str()) == 0) {
-            issue();
+            frontend->error("DB of name " + db_name + " already exists.");
             return;
         }
     }
@@ -157,7 +153,7 @@ void ManageSystem::drop_db(const std::string &db_name) {
         ++idx;
     }
     if (idx == db_mapping.count) {
-        issue();
+        frontend->error("DB of name " + db_name + " does not exist.");
         return;
     }
 
@@ -192,7 +188,7 @@ void ManageSystem::show_dbs() {
 
 void ManageSystem::show_tables() {
     if (!current_db.valid) {
-        issue();
+        frontend->error("DB is not opened yet.");
         return;
     }
 
@@ -221,24 +217,24 @@ void ManageSystem::use_db(const std::string &db_name) {
     }
 
     if (!current_db.valid) {
-        issue();
+        frontend->error("DB of name " + db_name + " does not exist.");
         return;
     }
 }
 
 void ManageSystem::create_table(const std::string &table_name, const std::vector<Field> &field_list) {
     if (table_name.empty() || table_name.length() > MAX_TABLE_NAME_LEN) {
-        issue();
+        frontend->error("Tb name shall be neither empty nor longer than " + std::to_string(MAX_TABLE_NAME_LEN) + ".");
         return;
     }
 
     if (db_mapping.count + 1 >= MAX_TABLE_COUNT) {
-        issue();
+        frontend->error("No more tables! You promised!");
         return;
     }
 
     if (!current_db.valid) {
-        issue();
+        frontend->error("Db is not opened yet.");
         return;
     }
 
@@ -250,7 +246,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
             current_id_max = table_mapping.mapping[i].id;
         }
         if (strcmp(table_mapping.mapping[i].name, table_name.c_str()) == 0) {
-            issue();
+            frontend->error("Table of name " + table_name + " already exists.");
             return;
         }
     }
@@ -266,7 +262,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
     table_info.field_count = 0;
     for (const auto &f: field_list) {
         if (f.name.length() > MAX_COLUMN_NAME_LEN) {
-            issue();
+            frontend->warning("Column name shall be no longer than " + std::to_string(MAX_COLUMN_NAME_LEN) + " chars.");
         }
         auto &table_info_field = table_info.fields[table_info.field_count];
         switch (f.type) {
@@ -336,14 +332,14 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
 
     if (column_list.size() != 1) {
-        issue();
+        frontend->error("Only single-column indexing is supported.");
         return;
     }
 
     std::size_t column_id = find_column_by_name(table_id, column_list[0]);
     auto &field = info.fields[column_id];
     if (field.indexed) {
-        issue();
+        frontend->error("Column " + column_list[0] + " is already indexed.");
         return;
     }
 
@@ -359,14 +355,14 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
 
     if (column_list.size() != 1) {
-        issue();
+        frontend->error("Only single-column indexing is supported.");
         return;
     }
 
     std::size_t column_id = find_column_by_name(table_id, column_list[0]);
     auto &field = info.fields[column_id];
     if (!field.indexed) {
-        issue();
+        frontend->error("Column " + column_list[0] + " is not indexed.");
         return;
     }
 

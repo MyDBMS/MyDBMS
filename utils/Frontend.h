@@ -19,6 +19,10 @@ public:
     typedef std::vector<Column> Table;
 
     void print_table(const Table &table) const;
+
+    void error(const std::string &msg) const;
+
+    void warning(const std::string &msg) const;
 };
 
 class StdioFrontend : public Frontend {
