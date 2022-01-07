@@ -19,7 +19,7 @@ MyVisitor iVisitor{ms/*YourVisitor的构造函数*/};
 auto parse(std::string sSQL) {
     // 解析SQL语句sSQL的过程
     // 转化为输入流
-    std::cout<< "\n\x1b[34m[INFO]User Input: " << sSQL << "\x1b[0m\n" << std::endl;
+    std::cout<< "\n\x1b[34m[INFO] User Input: " << sSQL << "\x1b[0m\n" << std::endl;
     ANTLRInputStream sInputStream(sSQL);
     // 设置Lexer
     SQLLexer iLexer(&sInputStream);

@@ -54,10 +54,10 @@ void QuerySystem::search(std::string table_name, std::string column_name, int ke
                         std::cout << "NULL ";
                         break;
                     case Value::Type::STR:
-                        std::cout << value.asString();
+                        std::cout << value.asString() << " ";
                         break;
                     case Value::Type::INT:
-                        std::cout << value.asInt();
+                        std::cout << value.asInt() << " ";
                         break;
                 }
             }

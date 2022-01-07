@@ -91,10 +91,11 @@ IID IndexFile::location_at(int key){
         auto header = (IndexPageHeader *) page->data;
         if (header->is_leaf){  //  直接开始遍历key对应的位置
             u_int8_t now_key_id = header->first_key_id;  //  从开头开始
+            /* printf("location at, now_key_id is %d\n", now_key_id); */
             while (get_key(page, now_key_id) < key){
                 now_key_id = get_suc_key_id(page, now_key_id);
+                /* printf("location at, now_key_id is %d\n", now_key_id); */
             }
-            /* std::cout << "location at {" << now_page_id << " , " << now_key_id << "}" << std::endl; */
             return {now_page_id, now_key_id};
         }
         else {  //  开始遍历应该往哪个儿子走
@@ -118,6 +119,7 @@ IID IndexFile::location_at(int key){
 * @return               插入后是否需要上溢，true表示需要
 */
 bool IndexFile::insert_key_leaf(std::size_t page_id, u_int8_t suc_key_id, u_int32_t key, const RID &rid){
+    /* printf("insert key leaf %d %d %d\n", page_id, suc_key_id, key); */
     auto page = file->get_page(page_id);
     //  更新页头数据
     auto header = (IndexPageHeader *) page->data;
@@ -570,14 +572,17 @@ std::size_t IndexFile::create_node(int is_leaf, int parent, int pre_leaf, int su
 }
 
 void IndexFile::search(int lower_bound, int upper_bound, IndexScan &index_scan){
+    /* printf("search %d %d\n", lower_bound, upper_bound); */
     IID iid = location_at(lower_bound);
+    /* printf("IID is {%d %d}\n", iid.page_id, iid.key_id); */
     index_scan = IndexScan(file, upper_bound, iid);
 }
 
 void IndexFile::insert_record(int key, const RID &rid){
     /* printf("Insert record %d\n", key); */
     IID iid = location_at(key);
-    /* printf("iid is {%d , %d}\n", iid.page_id, iid.key_id); */
+    /* printf("IID is {%d , %d}\n", iid.page_id, iid.key_id);
+    printf("RID is {%d , %d}\n", rid.page_id, rid.slot_id); */
     //  插入并检测是否需要上溢
     if (insert_key_leaf(iid.page_id, iid.key_id, key, rid)){  //  需要上溢
         std::size_t now_page_id;

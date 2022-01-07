@@ -77,11 +77,11 @@ B+ 树的参数 `m` 保存在元信息页里，如果实例化时没有设置，
 
 ## 查询执行
 
-实现在目录 `qe` 下
+实现在目录 `qs` 下，见飞书文档
 
 ## 系统管理
 
-实现在目录 `sm` 下
+实现在目录 `ms` 下，见飞书文档
 
 ## 解析器
 
@@ -89,7 +89,9 @@ B+ 树的参数 `m` 保存在元信息页里，如果实例化时没有设置，
 
 可以接收用户输入 sql 语句，完成对应操作，并给出一些反应。
 
-使用例（demo版）：
+伪指令 `EXIT;` 可以退出程序。
 
-<img src="C:\Users\联想\AppData\Roaming\Typora\typora-user-images\image-20220106195724408.png" alt="image-20220106195724408" style="zoom:33%;" />
+可以用 `tests/test_sql` 作为输入进行测试。
+
+> $ ./bin/my_dbms < tests/test_sql
 

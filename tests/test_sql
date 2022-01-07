@@ -1,0 +1,29 @@
+DROP DATABASE THU;
+
+CREATE DATABASE THU;
+
+USE THU;
+
+CREATE TABLE student (
+    id INT NOT NULL,
+    uid INT,
+    name VARCHAR(20)
+);
+
+ALTER TABLE student ADD INDEX (uid);
+
+ALTER TABLE student ADD INDEX (id);
+
+INSERT INTO student VALUES (228, NULL, 'wangzhidong');
+
+INSERT INTO student VALUES (238, 5, 'qianhoude');
+
+INSERT INTO student VALUES (292, 3, 'sunxun');
+
+INSERT INTO student VALUES (300, 5, 'xuchenxi');
+
+SELECT * FROM student WHERE student.id = 228;
+
+SELECT * FROM student WHERE student.uid = 5;
+
+EXIT;

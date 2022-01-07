@@ -10,8 +10,8 @@
  * 用于使用页编号和槽编号在记录文件中唯一确定一条记录。
  */
 struct RID {
-    std::size_t page_id{};
-    std::size_t slot_id{};
+    u_int16_t page_id{};
+    u_int16_t slot_id{};
 };
 
 /**
