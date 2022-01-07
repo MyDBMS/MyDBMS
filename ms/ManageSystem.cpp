@@ -406,6 +406,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
         strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
         table_info_field.nullable = f.nullable;
+        table_info_field.unique = false;
         table_info_field.indexed = false;
         table_info_field.has_def = f.has_def;
 
@@ -543,6 +544,12 @@ void ManageSystem::describe_table(const std::string &table_name) {
     }
     for (std::size_t i = 0; i < info.field_count; ++i) {
         auto &f = info.fields[i];
+        if (f.unique) {
+            frontend->write_line(std::string("UNIQUE (") + f.column_name + ");");
+        }
+    }
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        auto &f = info.fields[i];
         if (f.indexed) {
             frontend->write_line(std::string("INDEX (") + f.column_name + ");");
         }
@@ -610,6 +617,7 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
 void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryField &primary_restriction) {
     std::size_t table_loc = find_table_by_name(table_name);
     add_primary_key(table_loc, primary_restriction);
+    update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
@@ -636,12 +644,14 @@ void ManageSystem::drop_primary_key(const std::string &table_name, const std::st
             ++restriction_loc;
         }
     }
+    update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
 void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignField &foreign_restriction) {
     std::size_t table_loc = find_table_by_name(table_name);
     add_foreign_key(table_loc, foreign_restriction);
+    update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
@@ -664,6 +674,21 @@ void ManageSystem::drop_foreign_key(const std::string &table_name, const std::st
         info.foreign_fields[restriction_loc] = info.foreign_fields[restriction_loc + 1];
         ++restriction_loc;
     }
+    update_table_mapping_file(current_db.id);
+    frontend->ok(0);
+}
+
+void ManageSystem::add_unique(const std::string &table_name, const std::string &column_name) {
+    std::size_t table_loc = find_table_by_name(table_name);
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    std::size_t column_id = find_column_by_name(table_loc, column_name);
+    auto &field = info.fields[column_id];
+    if (field.unique) {
+        frontend->error("Column " + column_name + " is already unique!");
+        return;
+    }
+    field.unique = true;
+    update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
@@ -693,6 +718,8 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
             return STR_TOO_LONG;
         }
     }
+
+    // TODO: unique
 
     // Primary key restriction
     auto record_file = get_record_file(table_name);

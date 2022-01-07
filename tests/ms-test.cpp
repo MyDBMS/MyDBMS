@@ -189,10 +189,11 @@ void test_ms() {
         index_file->close();
     }
 
-    // test altering pk and foreign keys
+    // test altering pk, unique and foreign keys
     {
         ms.drop_primary_key(TABLE_NAME, "test_pk");
         ms.add_primary_key(TABLE_NAME, {"test_pk2", {"a"}});
+        ms.add_unique(TABLE_NAME, {"c"});
         ms.drop_foreign_key(TABLE_NAME, "foreign");
         ms.add_foreign_key(TABLE_NAME, {"foreign2", {"c"}, FOREIGN_TABLE_NAME, {"f"}});
     }
@@ -245,6 +246,7 @@ void test_ms() {
 4 rows in set
 PRIMARY KEY test_pk2(a);
 FOREIGN KEY foreign2(c) REFERENCES foreign_tb(f);
+UNIQUE (c);
 INDEX (c);
 )";
         assert(oss.str() == expected);

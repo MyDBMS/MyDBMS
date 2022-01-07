@@ -27,6 +27,7 @@ struct TableMapping {
             Field::Type type{};
             std::size_t str_len{};
             bool nullable{};
+            bool unique{};
             bool indexed{};
             bool has_def{};
             int def_int{};

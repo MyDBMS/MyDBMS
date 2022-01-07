@@ -123,6 +123,8 @@ public:
 
     void drop_foreign_key(const std::string &table_name, const std::string &restriction_name);
 
+    void add_unique(const std::string &table_name, const std::string &column_name);
+
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 
     char *from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, std::size_t &length);
