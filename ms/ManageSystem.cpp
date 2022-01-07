@@ -340,24 +340,35 @@ void ManageSystem::drop_table(const std::string &table_name) {
 void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {
     std::size_t table_id = find_table_by_name(table_name);
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    auto record_file = get_record_file(table_name);
+    std::size_t length_limit = get_record_length_limit(table_name);
+    auto buffer = new char[length_limit + 5];
 
-    if (column_list.size() != 1) {
-        frontend->error("Only single-column indexing is supported.");
-        return;
+    for (const auto &column_name: column_list) {
+        std::size_t column_id = find_column_by_name(table_id, column_name);
+        auto &field = info.fields[column_id];
+        if (field.indexed) {
+            frontend->error("Column " + column_name + " is already indexed.");
+            continue;
+        }
+        if (field.type != Field::INT) {
+            frontend->error("Column " + column_name + " is not of type INT and cannot be indexed.");
+            continue;
+        }
+
+        auto index_file_path = current_db.dir;
+        index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_name + ".txt");
+        is.create_file(index_file_path.c_str());
+        field.indexed = true;
+
+        auto index_file = get_index_file(table_name, column_name);
+        for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
+            std::size_t length = record_file->get_record(rid, buffer);
+            index_file->insert_record(from_bytes_to_record(table_name, buffer, length)[column_id].asInt(), rid);
+        }
     }
-
-    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
-    auto &field = info.fields[column_id];
-    if (field.indexed) {
-        frontend->error("Column " + column_list[0] + " is already indexed.");
-        return;
-    }
-
-    auto index_file_path = current_db.dir;
-    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
-    is.create_file(index_file_path.c_str());
-    field.indexed = true;
     update_table_mapping_file(current_db.id);
+    delete[] buffer;
 
     frontend->ok(0);
 }
@@ -366,22 +377,19 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
     std::size_t table_id = find_table_by_name(table_name);
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
 
-    if (column_list.size() != 1) {
-        frontend->error("Only single-column indexing is supported.");
-        return;
-    }
+    for (const auto &column_name: column_list) {
+        std::size_t column_id = find_column_by_name(table_id, column_name);
+        auto &field = info.fields[column_id];
+        if (!field.indexed) {
+            frontend->error("Column " + column_name + " is not indexed.");
+            continue;
+        }
 
-    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
-    auto &field = info.fields[column_id];
-    if (!field.indexed) {
-        frontend->error("Column " + column_list[0] + " is not indexed.");
-        return;
+        auto index_file_path = current_db.dir;
+        index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_name + ".txt");
+        IndexSystem::remove_file(index_file_path.c_str());
+        field.indexed = false;
     }
-
-    auto index_file_path = current_db.dir;
-    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
-    IndexSystem::remove_file(index_file_path.c_str());
-    field.indexed = false;
     update_table_mapping_file(current_db.id);
 
     frontend->ok(0);
@@ -477,7 +485,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
             case Value::STR:
                 memcpy(buffer + var_data_pos, v.asString().c_str(), v.asString().length());
                 var_data_pos += v.asString().length();
-                *(uint16_t *) (buffer + var_info_pos) = var_data_pos;
+                *(uint16_t * )(buffer + var_info_pos) = var_data_pos;
                 var_info_pos += 2;
                 break;
             case Value::INT:
@@ -510,7 +518,7 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
         auto f = info.fields[i];
         switch (f.type) {
             case Field::STR: {
-                std::size_t var_data_end_pos = *(uint16_t *) (buffer + var_info_pos);
+                std::size_t var_data_end_pos = *(uint16_t * )(buffer + var_info_pos);
                 char value[var_data_end_pos - var_data_pos + 1];
                 if (var_data_end_pos - var_data_pos > 0) {
                     memcpy(value, buffer + var_data_pos, var_data_end_pos - var_data_pos);
