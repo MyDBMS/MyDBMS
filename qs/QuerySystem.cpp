@@ -177,7 +177,8 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
     int cnt = 0;
     for(auto column : record_set.columns){
         Frontend::Column frontend_column;
-        frontend_column.name = column.table_name + "." + column.column_name;
+        if (column.has_table) frontend_column.name = column.table_name + "." + column.column_name;
+        else frontend_column.name = column.column_name;
         frontend_column.values.clear();
         for(auto record : record_set.record)
             frontend_column.values.push_back(from_Value_to_string(record.values[cnt]));
@@ -473,7 +474,25 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         }
         return result;
     }
-    else return input_result;  //  TODO： 拓展的两种投影子
+    else if (selector.type == Selector::Type::AGR_COL){
+
+    }
+    else if (selector.type == Selector::Type::CT){
+        RecordSet result;
+        Column column;
+        column.has_table = false;
+        column.column_name = "Count(*)";
+        result.columns.push_back(column);
+        RecordData rd;
+        rd.values.push_back(Value::make_value(int(input_result.record.size())));
+        result.record.push_back(rd);   
+        return result;
+    }
+    else{
+        ms.frontend->error("[QuerySystem] search selector doesn't match any rule");
+        flag = false;
+        return input_result;
+    }
 }
 
 RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Selector> selectors){
@@ -482,6 +501,14 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
     RecordSet result;  //  空的
     bool is_empty = true;
     for(auto selector : selectors){
+        if (selector.type == Selector::Type::CT){  //  这种情况只应该有一个投影子，返回一列一个数据表示数据量
+            if (selectors.size() > 1){
+                ms.frontend->error("Count(*) must be the only selector");
+                flag = false;
+                return input_result;
+            }
+            return search_selector(input_result, selector);  //  唯一，直接返回
+        }
         auto output_result = search_selector(input_result, selector);
         /* ms.frontend->print_table(from_RecordSet_to_Table(output_result)); */
         if (is_empty){

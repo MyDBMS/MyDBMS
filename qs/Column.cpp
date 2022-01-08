@@ -3,6 +3,7 @@
 Column::Column(){
     table_name = "";
     column_name = "";
+    has_table = true;
 }
 
 bool Column::operator < (const Column& other){
