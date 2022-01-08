@@ -14,3 +14,4 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 libantlr4-cpp-runtime.a
+load_sql
