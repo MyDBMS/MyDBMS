@@ -563,28 +563,31 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
     std::size_t length_limit = get_record_length_limit(table_name);
     auto buffer = new char[length_limit + 5];
 
-    for (const auto &column_name: column_list) {
-        std::size_t column_id = find_column_by_name(table_id, column_name);
-        auto &field = info.fields[column_id];
-        if (field.indexed) {
-            frontend->error("Column " + column_name + " is already indexed.");
-            continue;
-        }
-        if (field.type != Field::INT) {
-            frontend->error("Column " + column_name + " is not of type INT and cannot be indexed.");
-            continue;
-        }
+    if (column_list.size() != 1) {
+        frontend->error("Only single-column indexing is supported.");
+        return;
+    }
 
-        auto index_file_path = current_db.dir;
-        index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_name + ".txt");
-        is.create_file(index_file_path.c_str());
-        field.indexed = true;
+    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    auto &field = info.fields[column_id];
+    if (field.indexed) {
+        frontend->error("Column " + column_list[0] + " is already indexed.");
+        return;
+    }
+    if (field.type != Field::INT) {
+        frontend->error("Column " + column_list[0] + " is not of type INT and cannot be indexed.");
+        return;
+    }
 
-        auto index_file = get_index_file(table_name, column_name);
-        for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
-            std::size_t length = record_file->get_record(rid, buffer);
-            index_file->insert_record(from_bytes_to_record(table_name, buffer, length)[column_id].asInt(), rid);
-        }
+    auto index_file_path = current_db.dir;
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
+    is.create_file(index_file_path.c_str());
+    field.indexed = true;
+
+    auto index_file = get_index_file(table_name, column_list[0]);
+    for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
+        std::size_t length = record_file->get_record(rid, buffer);
+        index_file->insert_record(from_bytes_to_record(table_name, buffer, length)[column_id].asInt(), rid);
     }
     update_table_mapping_file(current_db.id);
     delete[] buffer;
@@ -596,19 +599,22 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
     std::size_t table_id = find_table_by_name(table_name);
     auto &info = table_mapping_map[current_db.id].mapping[table_id];
 
-    for (const auto &column_name: column_list) {
-        std::size_t column_id = find_column_by_name(table_id, column_name);
-        auto &field = info.fields[column_id];
-        if (!field.indexed) {
-            frontend->error("Column " + column_name + " is not indexed.");
-            continue;
-        }
-
-        auto index_file_path = current_db.dir;
-        index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_name + ".txt");
-        IndexSystem::remove_file(index_file_path.c_str());
-        field.indexed = false;
+    if (column_list.size() != 1) {
+        frontend->error("Only single-column indexing is supported.");
+        return;
     }
+
+    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    auto &field = info.fields[column_id];
+    if (!field.indexed) {
+        frontend->error("Column " + column_list[0] + " is not indexed.");
+        return;
+    }
+
+    auto index_file_path = current_db.dir;
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
+    IndexSystem::remove_file(index_file_path.c_str());
+    field.indexed = false;
     update_table_mapping_file(current_db.id);
 
     frontend->ok(0);
