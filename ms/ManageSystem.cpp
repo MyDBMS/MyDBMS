@@ -793,7 +793,7 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
 
     // Unique restriction
     for (std::size_t i = 0; i < info.field_count; ++i) {
-        if (info.fields[i].unique) {
+        if (info.fields[i].unique && !values[i].isNull()) {
             WhereClause clause;
             Column column;
             Expr expr;

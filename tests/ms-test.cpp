@@ -145,10 +145,23 @@ void test_ms() {
         assert(ms.validate_insert_data(TABLE_NAME, values) == Error::INSERT_FOREIGN_RESTRICTION_FAIL);
     }
 
+    // validate delete data
+    {
+        qs.insert_record(TABLE_NAME, {Value::make_value(3),
+                                      Value::make_value("233"),
+                                      Value::make_value(6),
+                                      Value::make_value(8.0f)});
+        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(4)}) ==
+               Error::DELETE_NONE);
+        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(3)}) ==
+               Error::DELETE_FOREIGN_RESTRICTION_FAIL);
+    }
+
     // test comparison
     {
         assert(Value::make_value() == Value::make_value());
-        assert(Value::make_value() != Value::make_value(233));
+        assert((Value::make_value() == Value::make_value(1)) == false);
+        assert((Value::make_value() != Value::make_value(233)) == false);
         assert(Value::make_value(42) == Value::make_value(42));
         assert(Value::make_value(80) > Value::make_value(42));
         assert(Value::make_value(12) < Value::make_value(42));
@@ -156,7 +169,7 @@ void test_ms() {
         assert(!(Value::make_value() < Value::make_value(42)));
         assert(!(Value::make_value(42) == Value::make_value("abc")));
         assert(!(Value::make_value(42) > Value::make_value("abc")));
-        assert(Value::make_value(42) != Value::make_value("abc"));
+        assert((Value::make_value(42) != Value::make_value("abc")) == false);
     }
 
     // convert between record and bytes
