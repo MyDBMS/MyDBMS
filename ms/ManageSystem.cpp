@@ -438,9 +438,13 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 }
 
 void ManageSystem::drop_table(const std::string &table_name) {
-    std::size_t table_id = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     auto &mapping = table_mapping_map[current_db.id].mapping;
-    auto &info = mapping[table_id];
+    auto &info = mapping[table_loc];
 
     // Remove record file
     std::filesystem::path file_path = current_db.dir;
@@ -458,9 +462,9 @@ void ManageSystem::drop_table(const std::string &table_name) {
 
     // Remove table from table mapping info
     --table_mapping_map[current_db.id].count;
-    while (table_id < table_mapping_map[current_db.id].count) {
-        mapping[table_id] = mapping[table_id + 1];
-        ++table_id;
+    while (table_loc < table_mapping_map[current_db.id].count) {
+        mapping[table_loc] = mapping[table_loc + 1];
+        ++table_loc;
     }
     update_table_mapping_file(current_db.id);
 
@@ -468,7 +472,11 @@ void ManageSystem::drop_table(const std::string &table_name) {
 }
 
 void ManageSystem::describe_table(const std::string &table_name) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     Frontend::Table out_table{{"Field",   {}},
                               {"Type",    {}},
@@ -557,8 +565,12 @@ void ManageSystem::describe_table(const std::string &table_name) {
 }
 
 void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {
-    std::size_t table_id = find_table_by_name(table_name);
-    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     auto record_file = get_record_file(table_name);
     std::size_t length_limit = get_record_length_limit(table_name);
     auto buffer = new char[length_limit + 5];
@@ -568,7 +580,7 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
         return;
     }
 
-    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    std::size_t column_id = find_column_by_name(table_loc, column_list[0]);
     auto &field = info.fields[column_id];
     if (field.indexed) {
         frontend->error("Column " + column_list[0] + " is already indexed.");
@@ -596,15 +608,19 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
 }
 
 void ManageSystem::drop_index(const std::string &table_name, const std::vector<std::string> &column_list) {
-    std::size_t table_id = find_table_by_name(table_name);
-    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
 
     if (column_list.size() != 1) {
         frontend->error("Only single-column indexing is supported.");
         return;
     }
 
-    std::size_t column_id = find_column_by_name(table_id, column_list[0]);
+    std::size_t column_id = find_column_by_name(table_loc, column_list[0]);
     auto &field = info.fields[column_id];
     if (!field.indexed) {
         frontend->error("Column " + column_list[0] + " is not indexed.");
@@ -621,14 +637,22 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
 }
 
 void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryField &primary_restriction) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     add_primary_key(table_loc, primary_restriction);
     update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
 void ManageSystem::drop_primary_key(const std::string &table_name, const std::string &restriction_name) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     if (restriction_name.empty()) {
         info.primary_field_count = 0;
@@ -655,14 +679,22 @@ void ManageSystem::drop_primary_key(const std::string &table_name, const std::st
 }
 
 void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignField &foreign_restriction) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     add_foreign_key(table_loc, foreign_restriction);
     update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
 
 void ManageSystem::drop_foreign_key(const std::string &table_name, const std::string &restriction_name) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     std::size_t restriction_loc = 0;
     while (restriction_loc < info.foreign_field_count) {
@@ -685,7 +717,11 @@ void ManageSystem::drop_foreign_key(const std::string &table_name, const std::st
 }
 
 void ManageSystem::add_unique(const std::string &table_name, const std::string &column_name) {
-    std::size_t table_loc = find_table_by_name(table_name);
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("Table does not exist.");
+        return;
+    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     std::size_t column_id = find_column_by_name(table_loc, column_name);
     auto &field = info.fields[column_id];
@@ -701,8 +737,11 @@ void ManageSystem::add_unique(const std::string &table_name, const std::string &
 Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {
     using namespace Error;
 
-    std::size_t table_id = find_table_by_name(table_name);
-    auto &info = table_mapping_map[current_db.id].mapping[table_id];
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        return TABLE_DOES_NOT_EXIST;
+    }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     if (info.field_count != values.size()) {
         return VALUE_COUNT_MISMATCH;
     }
@@ -949,9 +988,10 @@ Field ManageSystem::get_column_info(const std::string &table_name, const std::st
         /* type */      info.type,
         /* str_len */   info.str_len,
         /* nullable */  info.nullable,
-        /* def_int */   0,
-        /* def_float */ 0,
-        /* def_str */   "",
+        /* has_def */   info.has_def,
+        /* def_int */   info.def_int,
+        /* def_float */ info.def_float,
+        /* def_str */   info.def_str,
     };
 }
 

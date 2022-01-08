@@ -8,5 +8,6 @@ namespace Error {
         STR_TOO_LONG,
         FIELD_CANNOT_BE_NULL,
         PRIMARY_RESTRICTION_FAIL,
+        TABLE_DOES_NOT_EXIST,
     };
 }
