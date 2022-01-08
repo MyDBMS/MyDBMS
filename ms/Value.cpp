@@ -124,6 +124,9 @@ Value& Value::operator=(const Value& rhs){
         case INT:
             data = (void *) new int(*(int *) rhs.data);
             break;
+        case FLOAT:
+            data = (void *) new float(*(float *) rhs.data);
+            break;
         default:
             assert(false);
     }

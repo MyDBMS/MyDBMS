@@ -1,7 +1,7 @@
 cmake-build-*
 /.idea/
 /.vscode/
-/bin/
+/bin
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles
