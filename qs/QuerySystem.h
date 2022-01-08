@@ -20,6 +20,8 @@ private:
 
     RecordSet merge_Recordset(RecordSet a, RecordSet b);
 
+    bool compare_Value(Value a, Value b, WhereClause::OP_Type op_type);
+
     bool is_some_column_exist(RecordSet record_set, Column column);
 
     Value get_column_value(std::vector<Column> columns, RecordData record_data, Column column);

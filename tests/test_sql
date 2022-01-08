@@ -39,4 +39,6 @@ INSERT INTO teacher VALUES (150, 'fengjianhua');
 
 SELECT student.uid, student.name, teacher.name FROM student, teacher WHERE student.uid = 5 AND teacher.name <> 'fengjianhua';
 
+SELECT * FROM student WHERE student.uid = (SELECT student.uid FROM student WHERE student.name = 'xuchenxi');
+
 EXIT;

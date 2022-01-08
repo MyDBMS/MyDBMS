@@ -57,6 +57,45 @@ RecordSet QuerySystem::merge_Recordset(RecordSet a, RecordSet b){
     return c;
 }
 
+bool QuerySystem::compare_Value(Value a, Value b, WhereClause::OP_Type op_type){
+    if (a.type == Value::Type::NUL && b.type == Value::Type::NUL)
+        return op_type == WhereClause::OP_Type::EQ;  //  两 null 比较，只有相等是 true
+    if (a.type == Value::Type::NUL || b.type == Value::Type::NUL){
+        ms.frontend->error("Null value cannot participate in comparison");
+        flag = false;
+        return false;
+    }
+    //  两者皆非 null
+    if (a.type != b.type){  //  类型不一致
+        ms.frontend->error("The two compared value types do not match");
+        flag = false;
+        return false;
+    }
+    switch (op_type){
+        case WhereClause::OP_Type::EQ :
+            return a == b;
+            break;
+        case WhereClause::OP_Type::LT :
+            return a < b;
+            break;
+        case WhereClause::OP_Type::LE :
+            return a <= b;
+            break;
+        case WhereClause::OP_Type::GT :
+            return a > b;
+            break;
+        case WhereClause::OP_Type::GE :
+            return a >= b;
+            break;
+        case WhereClause::OP_Type::NEQ :
+            return a != b;
+            break;
+        default:
+            assert(false);
+            break;
+    }
+}
+
 bool QuerySystem::is_some_column_exist(RecordSet record_set, Column column){
     for(auto col : record_set.columns){
         if (col == column) return true;
@@ -66,9 +105,18 @@ bool QuerySystem::is_some_column_exist(RecordSet record_set, Column column){
 
 Value QuerySystem::get_column_value(std::vector<Column> columns, RecordData record_data, Column column){
     int cnt = 0;
+    bool is_exist = false;
     for(auto col : columns){
-        if (col == column) break; 
+        if (col == column){
+            is_exist = true;
+            break; 
+        }
         cnt ++;
+    }
+    if (!is_exist){
+        ms.frontend->error("column value is not exist");
+        flag = false;
+        return Value::make_value();
     }
     return record_data[cnt];
 }
@@ -175,12 +223,47 @@ RecordSet QuerySystem::search_by_index(std::string table_name, std::string colum
 
 RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause where_clause){
     if (where_clause.type == WhereClause::Type::OP_EXPR){  //  COL OP EXPR
-        ms.frontend->warning("[QuerySystem] search where (COL OP EXPR) hasn't been finished yet");
-        return input_result;
+        /* ms.frontend->warning("[QuerySystem] search where (COL OP EXPR) hasn't been finished yet"); */
+        auto column = where_clause.column;
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            //  在这条产生式里，跳过 Null 值
+            if (col_val.type == Value::NUL) continue;
+            if (where_clause.expr.type == Expr::Type::VALUE){
+                if (compare_Value(col_val, where_clause.expr.value, where_clause.op_type))
+                    result.record.push_back(data);
+            }
+            else if (where_clause.expr.type == Expr::Type::COLUMN){
+                auto cmp_val = get_column_value(input_result.columns, data, column);
+                if (compare_Value(col_val, cmp_val, where_clause.op_type))
+                    result.record.push_back(data);
+            }
+        }
+        return result;
     }
     else if (where_clause.type == WhereClause::Type::OP_SELECT){  //  COL OP SELECT
-        ms.frontend->warning("[QuerySystem] search where (COL OP SELECT) hasn't been finished yet");
-        return input_result;
+        /* ms.frontend->warning("[QuerySystem] search where (COL OP SELECT) hasn't been finished yet"); */
+        auto column = where_clause.column;
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        if (where_clause.select_result.columns.size() != 1 || where_clause.select_result.record.size() != 1){
+            ms.frontend->error("select where column = select_table, select_table's size isn't 1");
+            flag = false;
+            return input_result;
+        }
+        auto cmp_val = where_clause.select_result.record[0][0];
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            //  在这条产生式里，跳过 Null 值
+            if (col_val.type == Value::NUL) continue;
+            if (compare_Value(col_val, cmp_val, where_clause.op_type))
+                result.record.push_back(data);
+        }
+        return result;
     }
     else if (where_clause.type == WhereClause::Type::IS_NULL_OR_NOT_NULL){  //  COL IS (NOT) NULL
         ms.frontend->warning("[QuerySystem] search where (COL IS (NOT) NULL) hasn't been finished yet");
@@ -353,6 +436,8 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
 RecordSet QuerySystem::search(SelectStmt select_stmt){
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
     auto result = search_selectors(where_result, select_stmt.selectors);  //  再处理投影子
+    /* printf("search finished!\n");
+    ms.frontend->print_table(from_RecordSet_to_Table(result)); */
     return result;
 }
 
