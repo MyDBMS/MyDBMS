@@ -75,10 +75,9 @@ Value::Value(const Value &rhs) : str_len(rhs.str_len), type(rhs.type) {
 std::partial_ordering Value::operator<=>(const Value &rhs) const {
     if (type == NUL && rhs.type == NUL) {
         return std::partial_ordering::equivalent;
-    } else if (type == NUL || rhs.type == NUL) {
+    } else if (type != rhs.type) {
         return std::partial_ordering::unordered;
     } else {
-        assert(type == rhs.type);
         switch (type) {
             case STR:
                 return std::string((char *) data) <=> std::string((char *) rhs.data);
@@ -95,10 +94,9 @@ std::partial_ordering Value::operator<=>(const Value &rhs) const {
 bool Value::operator==(const Value &rhs) const {
     if (type == NUL && rhs.type == NUL) {
         return true;
-    } else if (type == NUL || rhs.type == NUL) {
+    } else if (type != rhs.type) {
         return false;
     } else {
-        assert(type == rhs.type);
         switch (type) {
             case STR:
                 return std::string((char *) data) == std::string((char *) rhs.data);

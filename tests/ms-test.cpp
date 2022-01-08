@@ -148,6 +148,10 @@ void test_ms() {
         assert(Value::make_value(80) > Value::make_value(42));
         assert(Value::make_value(12) < Value::make_value(42));
         assert(Value::make_value("xyz") != Value::make_value("abc"));
+        assert(!(Value::make_value() < Value::make_value(42)));
+        assert(!(Value::make_value(42) == Value::make_value("abc")));
+        assert(!(Value::make_value(42) > Value::make_value("abc")));
+        assert(Value::make_value(42) != Value::make_value("abc"));
     }
 
     // convert between record and bytes
