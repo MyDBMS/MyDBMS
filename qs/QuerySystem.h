@@ -38,9 +38,9 @@ private:
 
     RecordSet search_where_clauses(std::vector<std::string> table_names, std::vector<WhereClause> where_clauses);
 
-    RecordSet search_selector(RecordSet input_result, Selector selector);
+    RecordSet search_selector(RecordSet input_result, Selector selector, GroupBy group_by);
 
-    RecordSet search_selectors(RecordSet input_result, std::vector<Selector> selectors);
+    RecordSet search_selectors(RecordSet input_result, std::vector<Selector> selectors, GroupBy group_by);
 public:
     ManageSystem &ms;
 

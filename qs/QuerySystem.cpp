@@ -445,7 +445,7 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
     return result;
 }
 
-RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector){
+RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector, GroupBy group_by){
     /* printf("search selector\n"); */
     if (selector.type == Selector::Type::COL){
         auto column = selector.col;
@@ -466,6 +466,26 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         }
         RecordSet result;
         result.columns.push_back(column);
+        //  处理有 GROUP BY 的情况
+        if (!group_by.is_empty){
+            if (selector.col != group_by.column){
+                ms.frontend->error("select column name and group by column name are different");
+                flag = false;
+                return input_result;
+            }
+            std::map<Value, bool> calc_map;
+            calc_map.clear();
+            for(auto record : input_result.record){
+                auto group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                calc_map[group_by_val] = true;
+            }
+            for(auto ite : calc_map){
+                RecordData rd;
+                rd.values.push_back(ite.first);
+                result.record.push_back(rd);
+            }
+            return result;
+        }
         for(auto record : input_result.record){
             RecordData rd;
             rd.rid = record.rid;
@@ -475,7 +495,153 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         return result;
     }
     else if (selector.type == Selector::Type::AGR_COL){
-
+        RecordSet result;
+        Column column;
+        column.has_table = false;
+        //  不允许对字符类型作非Count聚合
+        bool is_str_type = ms.get_column_info(group_by.column.table_name, group_by.column.column_name).type == Field::Type::STR;
+        if (is_str_type && selector.agr_type != Selector::Aggregator_Type::COUNT){
+            ms.frontend->error("String type can only aggregate by Count()");
+            flag = false;
+            return input_result;
+        }
+        switch (selector.agr_type){
+            case Selector::Aggregator_Type::COUNT :
+                column.column_name = "Count(" + selector.col.table_name + "." + selector.col.column_name + ")";
+                break;
+            case Selector::Aggregator_Type::AVERAGE :
+                column.column_name = "Average(" + selector.col.table_name + "." + selector.col.column_name + ")";
+                break;
+            case Selector::Aggregator_Type::MAX :
+                column.column_name = "Max(" + selector.col.table_name + "." + selector.col.column_name + ")";
+                break;
+            case Selector::Aggregator_Type::MIN :
+                column.column_name = "Min(" + selector.col.table_name + "." + selector.col.column_name + ")";
+                break;
+            case Selector::Aggregator_Type::SUM :
+                column.column_name = "Sum(" + selector.col.table_name + "." + selector.col.column_name + ")";
+                break;
+            default :
+                assert(false);
+                break;
+        }
+        result.columns.push_back(column);
+        
+        //  处理聚合计算
+        {
+            int cnt_not_null = 0;
+            std::map<Value, Value> calc_map;
+            std::map<Value, int> count_map;
+            calc_map.clear();
+            count_map.clear();
+            for(auto record : input_result.record){
+                RecordData rd;
+                Value group_by_val;
+                //  没有 group by 的话，全部聚合到一起
+                if (group_by.is_empty) group_by_val = Value::make_value();
+                else group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                Value record_val = get_column_value(input_result.columns, record, selector.col);
+                if (record_val.type == Value::Type::NUL) continue;  //  不对 Null 作聚合
+                else cnt_not_null ++;
+                if (calc_map.find(group_by_val) == calc_map.end()){  //  创建初值
+                    count_map[group_by_val] = 1;
+                    switch (selector.agr_type){
+                        case Selector::Aggregator_Type::COUNT :
+                            calc_map[group_by_val] = Value::make_value(1);
+                            break;
+                        case Selector::Aggregator_Type::SUM :
+                        case Selector::Aggregator_Type::AVERAGE :
+                        case Selector::Aggregator_Type::MAX :
+                        case Selector::Aggregator_Type::MIN :
+                            calc_map[group_by_val] = record_val;
+                            break;
+                        default :
+                            assert(false);
+                            break;
+                    }
+                }
+                else{  //  更新值
+                    auto val = calc_map[group_by_val];
+                    count_map[group_by_val] += 1;
+                    switch (selector.agr_type){
+                        case Selector::Aggregator_Type::COUNT :
+                            calc_map[group_by_val] = val + Value::make_value(1);
+                            break;
+                        case Selector::Aggregator_Type::SUM :
+                        case Selector::Aggregator_Type::AVERAGE :
+                            calc_map[group_by_val] = val + record_val;
+                            break;
+                        case Selector::Aggregator_Type::MAX :
+                            if (record_val > val)
+                                calc_map[group_by_val] = record_val;
+                            break;
+                        case Selector::Aggregator_Type::MIN :
+                            if (record_val < val)
+                                calc_map[group_by_val] = record_val;
+                            break;
+                        default :
+                            assert(false);
+                            break;
+                    }
+                }
+            }
+            //  空表或没有任何非Null
+            /* if (cnt_not_null == 0){
+                RecordData rd;
+                switch (selector.agr_type){
+                    case Selector::Aggregator_Type::COUNT :
+                        rd.values.push_back(Value::make_value(0));
+                        result.record.push_back(rd);
+                        return result;
+                        break;
+                    case Selector::Aggregator_Type::SUM :
+                    case Selector::Aggregator_Type::AVERAGE :
+                    case Selector::Aggregator_Type::MAX :
+                    case Selector::Aggregator_Type::MIN :
+                        rd.values.push_back(Value::make_value());
+                        result.record.push_back(rd);
+                        return result;
+                        break;
+                    default :
+                        assert(false);
+                        break;
+                }
+            } */
+            //  否则，按 group_by_val 的偏序插入 RecordSet
+            for(auto ite : calc_map){
+                Value result_val = ite.second;
+                RecordData rd;
+                //  处理全 null
+                if (count_map[ite.first] == 0){
+                    switch (selector.agr_type){
+                        case Selector::Aggregator_Type::COUNT :
+                            rd.values.push_back(Value::make_value(0));
+                            result.record.push_back(rd);
+                            break;
+                        case Selector::Aggregator_Type::SUM :
+                        case Selector::Aggregator_Type::AVERAGE :
+                        case Selector::Aggregator_Type::MAX :
+                        case Selector::Aggregator_Type::MIN :
+                            rd.values.push_back(Value::make_value());
+                            result.record.push_back(rd);
+                            break;
+                        default :
+                            assert(false);
+                            break;
+                    }
+                    continue;
+                }
+                if (selector.agr_type == Selector::Aggregator_Type::AVERAGE){
+                    if (result_val.type == Value::Type::INT)
+                        result_val = Value::make_value((float)result_val.asInt() / count_map[ite.first]);
+                    else 
+                        result_val = Value::make_value(result_val.asFloat() / count_map[ite.first]);
+                }
+                rd.values.push_back(result_val);
+                result.record.push_back(rd);
+            }
+        }
+        return result;
     }
     else if (selector.type == Selector::Type::CT){
         RecordSet result;
@@ -495,7 +661,7 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
     }
 }
 
-RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Selector> selectors){
+RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Selector> selectors, GroupBy group_by){
     if (selectors.size() == 0) return input_result;  //  * 的情况
     /* printf("search selectors\n"); */
     RecordSet result;  //  空的
@@ -507,9 +673,9 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
                 flag = false;
                 return input_result;
             }
-            return search_selector(input_result, selector);  //  唯一，直接返回
+            return search_selector(input_result, selector, group_by);  //  唯一，直接返回
         }
-        auto output_result = search_selector(input_result, selector);
+        auto output_result = search_selector(input_result, selector, group_by);
         /* ms.frontend->print_table(from_RecordSet_to_Table(output_result)); */
         if (is_empty){
             result = output_result;
@@ -522,7 +688,7 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
 
 RecordSet QuerySystem::search(SelectStmt select_stmt){
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
-    auto result = search_selectors(where_result, select_stmt.selectors);  //  再处理投影子
+    auto result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
     /* printf("search finished!\n");
     ms.frontend->print_table(from_RecordSet_to_Table(result)); */
     return result;

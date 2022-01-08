@@ -320,6 +320,10 @@ public:
         ctx->select_stmt.selectors = ctx->selectors()->selectors;
         if (ctx->where_and_clause())
             ctx->select_stmt.where_clauses = ctx->where_and_clause()->where_clauses;
+        if (ctx->column()){
+            ctx->select_stmt.group_by.is_empty = false;
+            ctx->select_stmt.group_by.column = ctx->column()->column;
+        }
         return res;
     }
 

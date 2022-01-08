@@ -133,6 +133,42 @@ Value& Value::operator=(const Value& rhs){
     return *this;
 }
 
+bool Value::operator!=(const Value &rhs) const {
+    if (type != rhs.type) {
+        return false;
+    } else {
+        switch (type) {
+            case STR:
+                return std::string((char *) data) != std::string((char *) rhs.data);
+            case INT:
+                return *(int *) data != *(int *) rhs.data;
+            case FLOAT:
+                return *(float *) data != *(float *) rhs.data;
+            case NUL:
+                return false;
+            default:
+                assert(false);
+        }
+    }
+}
+Value Value::operator+(const Value &rhs) const {
+    if (type == NUL) {
+        return rhs;
+    } else if (rhs.type == NUL) {
+        return *this;
+    } else {
+        assert(type == rhs.type);
+        switch (type) {
+            case INT:
+                return Value(asInt() + rhs.asInt());
+            case FLOAT:
+                return Value(asFloat() + rhs.asFloat());
+            default:
+                assert(false);
+        }
+    }
+}
+
 Value::~Value() {
     switch (type) {
         case NUL:
