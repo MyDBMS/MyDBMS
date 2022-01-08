@@ -362,6 +362,15 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
         return;
     }
 
+    std::set<std::string> field_set;
+    for (const auto &f: field_list) {
+        if (field_set.find(f.name) != field_set.end()) {
+            frontend->error("Duplicate field name: " + f.name);
+            return;
+        }
+        field_set.insert(f.name);
+    }
+
     // Add record to table mapping
     TableMapping &table_mapping = table_mapping_map[current_db.id];
     std::size_t current_id_max = 0;
@@ -937,7 +946,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
             case Value::STR:
                 memcpy(buffer + var_data_pos, v.asString().c_str(), v.asString().length());
                 var_data_pos += v.asString().length();
-                *(uint16_t * )(buffer + var_info_pos) = var_data_pos;
+                *(uint16_t *) (buffer + var_info_pos) = var_data_pos;
                 var_info_pos += 2;
                 break;
             case Value::INT:
@@ -974,7 +983,7 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
         auto f = info.fields[i];
         switch (f.type) {
             case Field::STR: {
-                std::size_t var_data_end_pos = *(uint16_t * )(buffer + var_info_pos);
+                std::size_t var_data_end_pos = *(uint16_t *) (buffer + var_info_pos);
                 char value[var_data_end_pos - var_data_pos + 1];
                 if (var_data_end_pos - var_data_pos > 0) {
                     memcpy(value, buffer + var_data_pos, var_data_end_pos - var_data_pos);
