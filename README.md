@@ -95,3 +95,15 @@ B+ 树的参数 `m` 保存在元信息页里，如果实例化时没有设置，
 
 > $ ./bin/my_dbms < tests/test_sql
 
+## 脚本
+
+实现在目录 `script` 下。
+
+
+
+首先，请先将数据库创建，并导入表创建：
+
+> $ ./bin/my_dbms < tests/my_create.sql
+
+
+

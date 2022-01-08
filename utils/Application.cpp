@@ -5,7 +5,7 @@ auto Application::parse(const std::string &sSQL) {
     // std::cout << "\n\x1b[34m[INFO] User Input: " << sSQL << "\x1b[0m\n" << std::endl;
     // 转化为输入流
     antlr4::ANTLRInputStream sInputStream(sSQL);
-    frontend.info("user input: " + sSQL);
+    /* frontend.info("user input: " + sSQL); */
     // 设置Lexer
     SQLLexer iLexer(&sInputStream);
     antlr4::CommonTokenStream sTokenStream(&iLexer);

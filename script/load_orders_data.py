@@ -6,18 +6,14 @@ fo = open("script/load_sql", "w")
 
 fo.write("USE DATASET;\n")
 
-nation_is_str = [0, 1, 0, 1]
+is_str = [0, 0, 1, 0, 1, 1, 0, 1]
 
-nation_length = 4
+length = 8
 
-is_str = nation_is_str
-
-length = nation_length
-
-with open('./tests/data/nation.csv') as f:
+with open('./tests/data/orders.csv') as f:
     f_csv = csv.reader(f)
     for row in f_csv:
-        str = "INSERT INTO NATION VALUES ("
+        str = "INSERT INTO ORDERS VALUES ("
         cnt = 0
         for data in row:
             if (is_str[cnt] == 1):
@@ -36,6 +32,6 @@ fo.write("EXIT;\n")
 
 fo.close()
 
-# os.system('./bin/my_dbms < load_sql')
+os.system('./bin/my_dbms < script/load_sql')
 
-# os.remove("load_sql")
+os.remove("script/load_sql")
