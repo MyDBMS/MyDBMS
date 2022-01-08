@@ -20,7 +20,8 @@ public:
             return Value::make_value(std::stoi(ctx->Integer()->getText()));
         }
         else if (ctx->String()){  //  是字符串型
-            return Value::make_value(ctx->String()->getText());
+            std::string v = ctx->String()->getText();
+            return Value::make_value(v.substr(1, v.length() - 2));
         }
         else if (ctx->Float()){  //  是浮点数型
             return Value::make_value(std::stof(ctx->Float()->getText()));
