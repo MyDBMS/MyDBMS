@@ -30,6 +30,8 @@ public:
     IndexScan() = default;
 
     IndexScan(File *file, int upper_bound, IID iid);
+
+    IID RID_iid;
     
     /**
      * 获取记录。
@@ -84,6 +86,8 @@ class IndexFile {
     bool underflow(std::size_t page_id, u_int8_t key_id, u_int8_t &under_key_id, std::size_t &merge_page_id);
 
     bool delete_range_key(std::size_t page_id, int lower_bound, int upper_bound);
+    
+    bool delete_key_leaf(std::size_t page_id, std::size_t key_id);
 
 public:
 
@@ -110,12 +114,14 @@ public:
      */
     void insert_record(int key, const RID &rid);
 
+    void delete_record(int key, const RID &rid);
+
     /**
      * 从索引文件里删除一个区间的索引记录
      * @param lower_bound     索引值的下界
      * @param upper_bound     索引值的上界
      */
-    void delete_record(int lower_bound, int upper_bound);
+    void delete_record_range(int lower_bound, int upper_bound);
 
     void update_record(int old_key, const RID &old_rid, int new_key, const RID &new_rid);
 

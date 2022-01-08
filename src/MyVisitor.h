@@ -276,6 +276,14 @@ public:
         return res;
     }
 
+    virtual antlrcpp::Any visitDelete_from_table(SQLParser::Delete_from_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        auto where_clauses = ctx->where_and_clause()->where_clauses;
+        qs.delete_record(table_name, where_clauses);
+        return res;
+    }
+
     virtual antlrcpp::Any visitSelect_table_(SQLParser::Select_table_Context *ctx) override {
         auto res = visitChildren(ctx);
         qs.search_entry(ctx->select_table()->select_stmt);

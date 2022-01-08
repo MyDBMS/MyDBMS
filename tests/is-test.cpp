@@ -71,7 +71,7 @@ void multiple_data_test() {
         //  删除 [340, 460]
         int d_L = 340;
         int d_R = 460;
-        file->delete_record(L, R);
+        file->delete_record_range(L, R);
 
         //  再查找 [300, 500]
         file->search(L, R, index_scan);

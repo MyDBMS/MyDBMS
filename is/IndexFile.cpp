@@ -10,6 +10,7 @@ bool IndexScan::get_next_entry(RID &rid){
     int key = ((u_int32_t *) page->data)[(INDEX_PAGE_HEADER_SIZE + now_iid.key_id * 8) >> 2];
     if (key > upper_bound) return false;
     memcpy(&rid, page->data + INDEX_PAGE_HEADER_SIZE + now_iid.key_id * 8 + 4, 4);
+    RID_iid = now_iid;  //  rid 对应的 iid
     now_iid.key_id = page->data[PAGE_SIZE - now_iid.key_id * 2 - 2 + 1];
     if (now_iid.key_id == 0){
         auto header = (IndexPageHeader *) page->data;
@@ -541,6 +542,48 @@ bool IndexFile::delete_range_key(std::size_t page_id, int lower_bound, int upper
     return max_key >= lower_bound && max_key <= upper_bound;
 }
 
+bool IndexFile::delete_key_leaf(std::size_t page_id, std::size_t key_id){
+    auto page = file->get_page(page_id);
+    auto header = (IndexPageHeader *) page->data;
+    if (header->key_num == 1){  //  整个叶子都删掉
+        auto now_page_id = page_id;
+        u_int8_t key_id;
+        while (true){
+            u_int8_t new_key_id;
+            auto now_page = file->get_page(now_page_id);
+            auto now_header = (IndexPageHeader *) now_page->data;
+            auto parent_page_id = now_header->parent;
+            std::size_t merge_page_id;
+            if (!underflow(now_page_id, key_id, new_key_id, merge_page_id)) break;
+            //  继续考虑下溢，注意特判下溢到根节点的情况
+            key_id = new_key_id;
+            if (parent_page_id == meta.root_page){
+                auto root_page = file->get_page(parent_page_id);
+                auto root_header = (IndexPageHeader *) root_page->data;
+                if (root_header->key_num > 1) delete_key(parent_page_id, key_id);
+                else{  //  删掉根节点
+                    //  更新元信息页与meta
+                    auto meta_page = file->get_page(0);
+                    auto meta_data = (IndexFileMeta *) meta_page->data;
+                    meta_data->root_page = merge_page_id;
+                    meta_page->dirty = true;
+                    meta.root_page = merge_page_id;
+                    //  更新 now_page_id 页的 parent
+                    now_header->parent = 0;
+                    now_page->dirty = true;
+                }
+                break;
+            }
+            now_page_id = parent_page_id;
+        }
+        return true;
+    }
+    auto now_key_id = key_id;
+    auto now_key = get_key(page, now_key_id);
+    delete_key(page_id, now_key_id);
+    return false;
+}
+
 IndexFile::IndexFile(File *file) : file(file) {
     auto page = file->get_page(0);
     memcpy(&meta, page->data, sizeof meta);
@@ -616,7 +659,19 @@ void IndexFile::insert_record(int key, const RID &rid){
     }
 }
 
-void IndexFile::delete_record(int lower_bound, int upper_bound){
+void IndexFile::delete_record(int key, const RID &old_rid){
+    IndexScan index_scan;
+    search(key, key, index_scan);
+    RID rid;
+    while (index_scan.get_next_entry(rid)){
+        if (rid.page_id == old_rid.page_id && rid.slot_id == old_rid.slot_id){
+            delete_key_leaf(index_scan.RID_iid.page_id, index_scan.RID_iid.key_id);
+            break;
+        }
+    }
+}
+
+void IndexFile::delete_record_range(int lower_bound, int upper_bound){
     IID iid = location_at(lower_bound);
     auto now_leaf_id = iid.page_id;
     while (true){
@@ -629,8 +684,7 @@ void IndexFile::delete_record(int lower_bound, int upper_bound){
 }
 
 void IndexFile::update_record(int old_key, const RID &old_rid, int new_key, const RID &new_rid){
-    delete_record(old_key, old_key);
-    insert_record(new_key, new_rid);
+    
 }
 
 void IndexFile::close() {

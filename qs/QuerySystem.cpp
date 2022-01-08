@@ -26,11 +26,12 @@ RecordSet QuerySystem::join_Recordset(RecordSet a, RecordSet b){
     for(auto a_data : a.record)
         for(auto b_data : b.record){
             RecordData c_data;
-            c_data.clear();
-            for(auto a_value : a_data)
-                c_data.push_back(a_value);
-            for(auto b_value : b_data)
-                c_data.push_back(b_value);
+            c_data.rid = b_data.rid;
+            c_data.values.clear();
+            for(auto a_value : a_data.values)
+                c_data.values.push_back(a_value);
+            for(auto b_value : b_data.values)
+                c_data.values.push_back(b_value);
             c.record.push_back(c_data);
         }
     return c;
@@ -45,12 +46,13 @@ RecordSet QuerySystem::merge_Recordset(RecordSet a, RecordSet b){
     int cnt = 0;
     for(auto a_data : a.record){
         RecordData c_data;
-        c_data.clear();
-        for(auto a_value : a_data)
-            c_data.push_back(a_value);
+        c_data.rid = a_data.rid;
+        c_data.values.clear();
+        for(auto a_value : a_data.values)
+            c_data.values.push_back(a_value);
         auto b_data = b.record[cnt];
-        for(auto b_value : b_data)
-            c_data.push_back(b_value);
+        for(auto b_value : b_data.values)
+            c_data.values.push_back(b_value);
         c.record.push_back(c_data);
         cnt ++;
     }
@@ -118,7 +120,7 @@ Value QuerySystem::get_column_value(std::vector<Column> columns, RecordData reco
         flag = false;
         return Value::make_value();
     }
-    return record_data[cnt];
+    return record_data.values[cnt];
 }
 
 Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
@@ -130,7 +132,7 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
         frontend_column.name = column.table_name + "." + column.column_name;
         frontend_column.values.clear();
         for(auto record : record_set.record)
-            frontend_column.values.push_back(from_Value_to_string(record[cnt]));
+            frontend_column.values.push_back(from_Value_to_string(record.values[cnt]));
         table.push_back(frontend_column);
         cnt ++;
     }
@@ -186,7 +188,11 @@ RecordSet QuerySystem::search_whole_table(std::string table_name){
         char* buffer = new char[max_length];
         std::size_t length = record_file->get_record(rid, buffer);
         auto values = ms.from_bytes_to_record(table_name, buffer, length);
-        record_set.record.push_back(values);
+        RecordData rd;
+        rd.rid = rid;
+        rd.values = values;
+        /* record_set.record.push_back(values); */
+        record_set.record.push_back(rd);
         rid = record_file->find_next(rid);
     }
     return record_set;
@@ -215,7 +221,11 @@ RecordSet QuerySystem::search_by_index(std::string table_name, std::string colum
             char* buffer = new char[max_length];
             std::size_t length = record_file->get_record(rid, buffer);
             auto values = ms.from_bytes_to_record(table_name, buffer, length);
-            record_set.record.push_back(values);
+            RecordData rd;
+            rd.rid = rid;
+            rd.values = values;
+            /* record_set.record.push_back(values); */
+            record_set.record.push_back(rd);
         }
     }
     return record_set;
@@ -255,7 +265,7 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
             flag = false;
             return input_result;
         }
-        auto cmp_val = where_clause.select_result.record[0][0];
+        auto cmp_val = where_clause.select_result.record[0].values[0];
         for(auto data : input_result.record){
             auto col_val = get_column_value(input_result.columns, data, column);
             //  在这条产生式里，跳过 Null 值
@@ -408,7 +418,8 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         result.columns.push_back(column);
         for(auto record : input_result.record){
             RecordData rd;
-            rd.push_back(record[cnt]);
+            rd.rid = record.rid;
+            rd.values.push_back(record.values[cnt]);
             result.record.push_back(rd);
         }
         return result;
@@ -439,6 +450,35 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
     /* printf("search finished!\n");
     ms.frontend->print_table(from_RecordSet_to_Table(result)); */
     return result;
+}
+
+void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause> where_clauses){
+    //  构造查找语句，查询所有满足删除条件的记录
+    SelectStmt select_stmt;
+    select_stmt.table_names.push_back(table_name);
+    select_stmt.where_clauses = where_clauses;
+    auto result = search(select_stmt);
+    //  遍历每一条需要删除的记录
+    auto record_file = ms.get_record_file(table_name);
+    for(auto record : result.record){
+        RID rid = record.rid;
+        auto values = record.values;
+        //  TODO: 判断删除是否合法
+        record_file->delete_record(rid);
+        //  枚举所有的索引
+        auto indexs = ms.get_index_ids(table_name);
+        for(auto column_id : indexs){
+            auto column_name = ms.get_column_name(table_name, column_id);
+            auto value = values[column_id];
+            if (value.type != Value::NUL){
+                int key = value.asInt();
+                /* std::cout << "[QuerySystem] insert record " << table_name << " " << column_name << " " << key << std::endl;
+                printf("RID is { %d , %d }\n", rid.page_id, rid.slot_id); */
+                auto index_file = ms.get_index_file(table_name, column_name);
+                index_file->delete_record(key, rid);
+            }
+        }
+    }
 }
 
 void QuerySystem::search_entry(SelectStmt select_stmt){

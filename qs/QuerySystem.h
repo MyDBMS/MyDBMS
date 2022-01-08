@@ -46,6 +46,8 @@ public:
 
     void insert_record(std::string table_name, std::vector<Value> values);
 
+    void delete_record(std::string table_name, std::vector<WhereClause> where_clauses);
+
     RecordSet search(SelectStmt select_stmt);
 
     void search_entry(SelectStmt select_stmt);

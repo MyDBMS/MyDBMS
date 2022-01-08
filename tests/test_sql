@@ -56,4 +56,8 @@ SELECT student.uid, student.name, teacher.name FROM student, teacher WHERE stude
 
 SELECT * FROM student WHERE student.uid = (SELECT student.uid FROM student WHERE student.name = 'xuchenxi');
 
+DELETE FROM student WHERE student.uid = (SELECT student.uid FROM student WHERE student.name = 'xuchenxi');
+
+SELECT * FROM student;
+
 EXIT;

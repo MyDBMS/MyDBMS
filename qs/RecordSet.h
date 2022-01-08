@@ -1,11 +1,18 @@
 #pragma once
 
 #include "../ms/Value.h"
+#include "../rs/RecordSystem.h"
 #include "Column.h"
 
 #include <vector>
 
-typedef std::vector<Value> RecordData;
+struct RecordData {
+public:
+    RID rid;
+    std::vector<Value> values;
+
+    RecordData();
+};
 
 struct RecordSet {
 public:
