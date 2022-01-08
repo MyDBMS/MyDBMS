@@ -26,4 +26,5 @@ void Application::run() {
         if (stmt == "EXIT;") break;
         parse(stmt);
     }
+    frontend.write_line("Bye");
 }

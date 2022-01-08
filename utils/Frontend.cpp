@@ -1,5 +1,16 @@
 #include "Frontend.h"
 
+std::string Frontend::read_stmt() {
+    char ch;
+    std::string s;
+    while (true) {
+        ch = read_char();
+        if (ch == EOF) return "EXIT;";
+        if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
+        if (ch == ';') return s;
+    }
+}
+
 std::string Frontend::pad(const std::string &s, std::size_t max_width) {
     return " " + s + std::string(max_width - s.length() + 1, ' ');
 }
@@ -84,14 +95,8 @@ void StdioFrontend::write_string(const std::string &s) const {
     std::cout << s;
 }
 
-std::string StdioFrontend::read_stmt() {
-    char ch;
-    std::string s;
-    while (true) {
-        ch = (char) std::cin.get();
-        if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
-        if (ch == ';') return s;
-    }
+char StdioFrontend::read_char() {
+    return (char) std::cin.get();
 }
 
 void StringStreamFrontend::write_string(const std::string &s) const {
@@ -101,12 +106,6 @@ void StringStreamFrontend::write_string(const std::string &s) const {
 StringStreamFrontend::StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream)
         : istream(istream), ostream(ostream) {}
 
-std::string StringStreamFrontend::read_stmt() {
-    char ch;
-    std::string s;
-    while (true) {
-        ch = (char) istream.get();
-        if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
-        if (ch == ';') return s;
-    }
+char StringStreamFrontend::read_char() {
+    return (char) istream.get();
 }
