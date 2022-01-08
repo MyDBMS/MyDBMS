@@ -499,7 +499,7 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         Column column;
         column.has_table = false;
         //  不允许对字符类型作非Count聚合
-        bool is_str_type = ms.get_column_info(group_by.column.table_name, group_by.column.column_name).type == Field::Type::STR;
+        bool is_str_type = ms.get_column_info(selector.col.table_name, selector.col.column_name).type == Field::Type::STR;
         if (is_str_type && selector.agr_type != Selector::Aggregator_Type::COUNT){
             ms.frontend->error("String type can only aggregate by Count()");
             flag = false;

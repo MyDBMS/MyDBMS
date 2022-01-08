@@ -70,6 +70,6 @@ INSERT INTO student VALUES (300, 10, 'andi');
 
 SELECT student.uid, COUNT(student.id), SUM(student.id), AVG(student.id), MAX(student.id), MIN(student.id) FROM student GROUP BY student.uid;
 
-SELECT COUNT(student.uid) FROM student GROUP BY student.id;
+SELECT SUM(student.uid) FROM student;
 
 EXIT;
