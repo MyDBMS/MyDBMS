@@ -81,7 +81,7 @@ std::pair<std::size_t, u_int16_t> RecordFile::vacancy_at(BufferPage *page, std::
         // 找到最后一条记录的末尾，计算剩余部分长度
         u_int16_t last_slot_offset = get_slot_offset(page, slot_id - 1);
         assert(last_slot_offset >= RECORD_PAGE_HEADER_SIZE);
-        u_int16_t last_record_size = *((u_int16_t *) (page->data + last_slot_offset + meta.fixed_size - 2));
+        u_int16_t last_record_size = meta.var_cnt == 0 ? meta.fixed_size : *((u_int16_t *) (page->data + last_slot_offset + meta.fixed_size - 2));
         u_int16_t slot_offset = last_slot_offset + last_record_size;
         assert(slot_offset >= RECORD_PAGE_HEADER_SIZE);
         return std::make_pair(PAGE_SIZE - slot_offset - header->slot_cnt * 2 - 2, slot_offset);
