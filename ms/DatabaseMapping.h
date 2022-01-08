@@ -2,8 +2,8 @@
 
 #include <string>
 
-#define MAX_DB_COUNT 20
-#define MAX_DB_NAME_LEN 20
+#define MAX_DB_COUNT 16
+#define MAX_DB_NAME_LEN 32
 
 struct DatabaseMapping {
     std::size_t count{};

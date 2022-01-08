@@ -347,6 +347,11 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
         return;
     }
 
+    if (field_list.size() > MAX_COLUMN_COUNT) {
+        frontend->error("Too many columns!");
+        return;
+    }
+
     if (primary_field_list.size() > MAX_PRIMARY_FIELD_COUNT) {
         frontend->error("Too many primary fields!");
         return;
