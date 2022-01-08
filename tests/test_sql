@@ -2,17 +2,32 @@ DROP DATABASE THU;
 
 CREATE DATABASE THU;
 
+SHOW DATABASES;
+
 USE THU;
 
 CREATE TABLE student (
     id INT NOT NULL,
     uid INT,
-    name VARCHAR(20)
+    name VARCHAR(20),
+    PRIMARY KEY (uid)
 );
+
+SHOW TABLES;
+
+SHOW INDEXES;
 
 ALTER TABLE student ADD INDEX (uid);
 
 ALTER TABLE student ADD INDEX (id);
+
+ALTER TABLE student DROP PRIMARY KEY;
+
+ALTER TABLE student ADD CONSTRAINT pk PRIMARY KEY (id);
+
+ALTER TABLE student ADD UNIQUE (name);
+
+DESC student;
 
 INSERT INTO student VALUES (228, NULL, 'wangzhidong');
 

@@ -101,6 +101,8 @@ public:
 
     void show_tables();
 
+    void show_indexes() const;
+
     void use_db(const std::string &db_name);
 
     void create_table(const std::string &table_name, const std::vector<Field> &field_list,
@@ -123,7 +125,7 @@ public:
 
     void drop_foreign_key(const std::string &table_name, const std::string &restriction_name);
 
-    void add_unique(const std::string &table_name, const std::string &column_name);
+    void add_unique(const std::string &table_name, const std::vector<std::string> &column_list);
 
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 

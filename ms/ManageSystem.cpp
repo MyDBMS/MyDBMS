@@ -296,6 +296,10 @@ void ManageSystem::show_tables() {
     frontend->print_table({c});
 }
 
+void ManageSystem::show_indexes() const {
+    frontend->error("Bare SHOW INDEXES stmt is not supported!");
+}
+
 void ManageSystem::use_db(const std::string &db_name) {
     // Check if there is already an open db
     if (current_db.valid) {
@@ -716,17 +720,21 @@ void ManageSystem::drop_foreign_key(const std::string &table_name, const std::st
     frontend->ok(0);
 }
 
-void ManageSystem::add_unique(const std::string &table_name, const std::string &column_name) {
+void ManageSystem::add_unique(const std::string &table_name, const std::vector<std::string> &column_list) {
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
         return;
     }
+    if (column_list.size() != 1) {
+        frontend->error("Only single-column unique constraint is supported.");
+        return;
+    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
-    std::size_t column_id = find_column_by_name(table_loc, column_name);
+    std::size_t column_id = find_column_by_name(table_loc, column_list[0]);
     auto &field = info.fields[column_id];
     if (field.unique) {
-        frontend->error("Column " + column_name + " is already unique!");
+        frontend->error("Column " + column_list[0] + " is already unique!");
         return;
     }
     field.unique = true;
@@ -881,7 +889,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
             case Value::STR:
                 memcpy(buffer + var_data_pos, v.asString().c_str(), v.asString().length());
                 var_data_pos += v.asString().length();
-                *(uint16_t *) (buffer + var_info_pos) = var_data_pos;
+                *(uint16_t * )(buffer + var_info_pos) = var_data_pos;
                 var_info_pos += 2;
                 break;
             case Value::INT:
@@ -918,7 +926,7 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
         auto f = info.fields[i];
         switch (f.type) {
             case Field::STR: {
-                std::size_t var_data_end_pos = *(uint16_t *) (buffer + var_info_pos);
+                std::size_t var_data_end_pos = *(uint16_t * )(buffer + var_info_pos);
                 char value[var_data_end_pos - var_data_pos + 1];
                 if (var_data_end_pos - var_data_pos > 0) {
                     memcpy(value, buffer + var_data_pos, var_data_end_pos - var_data_pos);
@@ -984,14 +992,14 @@ Field ManageSystem::get_column_info(const std::string &table_name, const std::st
     std::size_t column_id = find_column_by_name(table_id, column_name);
     auto info = table_mapping_map[current_db.id].mapping[table_id].fields[column_id];
     return {
-        /* name */      info.column_name,
-        /* type */      info.type,
-        /* str_len */   info.str_len,
-        /* nullable */  info.nullable,
-        /* has_def */   info.has_def,
-        /* def_int */   info.def_int,
-        /* def_float */ info.def_float,
-        /* def_str */   info.def_str,
+            /* name */      info.column_name,
+            /* type */      info.type,
+            /* str_len */   info.str_len,
+            /* nullable */  info.nullable,
+            /* has_def */   info.has_def,
+            /* def_int */   info.def_int,
+            /* def_float */ info.def_float,
+            /* def_str */   info.def_str,
     };
 }
 

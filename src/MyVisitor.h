@@ -21,9 +21,13 @@ public:
         else if (ctx->String()){  //  是字符串型
             return Value::make_value(ctx->String()->getText());
         }
+        else if (ctx->Float()){  //  是浮点数型
+            return Value::make_value(std::stof(ctx->Float()->getText()));
+        }
         else if (ctx->Null()){  //  是NULL型
             return Value::make_value();
         }
+        else assert(false);
     }
 
     virtual antlrcpp::Any visitCreate_db(SQLParser::Create_dbContext *ctx) override {
@@ -40,10 +44,28 @@ public:
         return res;
     }
 
+    virtual antlrcpp::Any visitShow_dbs(SQLParser::Show_dbsContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ms.show_dbs();
+        return res;
+    }
+
     virtual antlrcpp::Any visitUse_db(SQLParser::Use_dbContext *ctx) override {
         auto res = visitChildren(ctx);
         std::string db_name = ctx->Identifier()->getText();
         ms.use_db(db_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitShow_tables(SQLParser::Show_tablesContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ms.show_tables();
+        return res;
+    }
+
+    virtual antlrcpp::Any visitShow_indexes(SQLParser::Show_indexesContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ms.show_indexes();
         return res;
     }
 
@@ -52,11 +74,24 @@ public:
         std::string table_name = ctx->Identifier()->getText();
         auto field_list_ctx = ctx->field_list();
         std::vector<Field> field_list;
-        field_list.clear();
+        std::vector<PrimaryField> primary_field_list;
+        std::vector<ForeignField> foreign_field_list;
         for(auto field_ctx : field_list_ctx->field()){
-            field_list.push_back(field_ctx->field_val);
+            switch (field_ctx->field_type) {
+                case SQLParser::FieldContext::BASIC:
+                    field_list.push_back(field_ctx->field_val);
+                    break;
+                case SQLParser::FieldContext::PRIMARY:
+                    primary_field_list.push_back(field_ctx->primary_field_val);
+                    break;
+                case SQLParser::FieldContext::FOREIGN:
+                    foreign_field_list.push_back(field_ctx->foreign_field_val);
+                    break;
+                default:
+                    assert(false);
+            }
         }
-        ms.create_table(table_name, field_list, {}, {});  // TODO: primary keys and foreign keys
+        ms.create_table(table_name, field_list, primary_field_list, foreign_field_list);
         return res;
     }
 
@@ -67,16 +102,63 @@ public:
         auto type_ctx = ctx->type_();
         if (type_ctx->children[0]->getText() == "INT"){
             field.type = Field::Type::INT;
+            if (ctx->value() != nullptr) {  // DEFAULT
+                field.has_def = true;
+                field.def_int = std::stoi(ctx->value()->Integer()->getText());
+            }
+            else field.has_def = false;
         }
         else if (type_ctx->children[0]->getText() == "VARCHAR"){
             field.type = Field::Type::STR;
             field.str_len = std::stoi(type_ctx->Integer()->getText());
+            if (ctx->value() != nullptr) {  // DEFAULT
+                field.has_def = true;
+                field.def_str = ctx->value()->String()->getText();
+            }
+            else field.has_def = false;
+        }
+        else if (type_ctx->children[0]->getText() == "FLOAT"){
+            field.type = Field::Type::FLOAT;
+            if (ctx->value() != nullptr) {  // DEFAULT
+                field.has_def = true;
+                field.def_float = std::stof(ctx->value()->Float()->getText());
+            }
+            else field.has_def = false;
         }
         if (ctx->Null()){  //  'NOT' Null
             field.nullable = false;
         }
         else field.nullable = true;
         ctx->field_val = field;
+        ctx->field_type = SQLParser::FieldContext::BASIC;
+        return res;
+    }
+
+    virtual antlrcpp::Any visitPrimary_key_field(SQLParser::Primary_key_fieldContext *ctx) override {
+        auto res = visitChildren(ctx);
+        PrimaryField field;
+        field.name = ctx->Identifier() == nullptr ? "" : ctx->Identifier()->getText();
+        for (const auto &id : ctx->identifiers()->Identifier()) {
+            field.columns.push_back(id->getText());
+        }
+        ctx->primary_field_val = field;
+        ctx->field_type = SQLParser::FieldContext::PRIMARY;
+        return res;
+    }
+
+    virtual antlrcpp::Any visitForeign_key_field(SQLParser::Foreign_key_fieldContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ForeignField field;
+        field.name = ctx->Identifier(0) == nullptr ? "" : ctx->Identifier(0)->getText();
+        for (const auto &id : ctx->identifiers(0)->Identifier()) {
+            field.columns.push_back(id->getText());
+        }
+        field.foreign_table_name = ctx->Identifier(1)->getText();
+        for (const auto &id : ctx->identifiers(1)->Identifier()) {
+            field.foreign_columns.push_back(id->getText());
+        }
+        ctx->foreign_field_val = field;
+        ctx->field_type = SQLParser::FieldContext::FOREIGN;
         return res;
     }
 
@@ -84,6 +166,69 @@ public:
         auto res = visitChildren(ctx);
         std::string table_name = ctx->Identifier()->getText();
         ms.drop_table(table_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitDescribe_table(SQLParser::Describe_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        ms.describe_table(table_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_table_drop_pk(SQLParser::Alter_table_drop_pkContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier(0)->getText();
+        std::string restriction_name = ctx->Identifier().size() == 1 ? "" : ctx->Identifier(1)->getText();
+        ms.drop_primary_key(table_name, restriction_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_table_drop_foreign_key(SQLParser::Alter_table_drop_foreign_keyContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier(0)->getText();
+        std::string restriction_name = ctx->Identifier(1)->getText();
+        ms.drop_foreign_key(table_name, restriction_name);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_table_add_pk(SQLParser::Alter_table_add_pkContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier(0)->getText();
+        std::string constraint_name = ctx->Identifier(1)->getText();
+        std::vector<std::string> identifiers;
+        for (const auto &it : ctx->identifiers()->Identifier()) {
+            identifiers.push_back(it->getText());
+        }
+        ms.add_primary_key(table_name, {constraint_name, identifiers});
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_table_add_foreign_key(SQLParser::Alter_table_add_foreign_keyContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier(0)->getText();
+        std::string constraint_name = ctx->Identifier(1)->getText();
+        std::string foreign_table_name = ctx->Identifier(1)->getText();
+        std::vector<std::string> identifiers;
+        for (const auto &it : ctx->identifiers(0)->Identifier()) {
+            identifiers.push_back(it->getText());
+        }
+        std::vector<std::string> foreign_identifiers;
+        for (const auto &it : ctx->identifiers(1)->Identifier()) {
+            foreign_identifiers.push_back(it->getText());
+        }
+        ms.add_foreign_key(table_name, {constraint_name, identifiers, foreign_table_name, foreign_identifiers});
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAlter_table_add_unique(SQLParser::Alter_table_add_uniqueContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        std::vector<std::string> identifiers;
+        for(auto column : ctx->identifiers()->Identifier()){
+            identifiers.push_back(column->getText());
+        }
+        ms.add_unique(table_name, identifiers);
         return res;
     }
 

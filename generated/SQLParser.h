@@ -425,7 +425,13 @@ public:
 
     virtual size_t getRuleIndex() const override;
 
+    enum {BASIC, PRIMARY, FOREIGN} field_type;
+
     Field field_val;
+
+    PrimaryField primary_field_val;
+
+    ForeignField foreign_field_val;
 
    
   };
