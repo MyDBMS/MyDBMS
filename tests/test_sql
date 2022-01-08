@@ -60,4 +60,8 @@ DELETE FROM student WHERE student.uid = (SELECT student.uid FROM student WHERE s
 
 SELECT * FROM student;
 
+UPDATE student SET uid = 10 WHERE student.id >= 228 AND student.id < 280;
+
+SELECT * FROM student;
+
 EXIT;

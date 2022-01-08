@@ -26,6 +26,8 @@ private:
 
     Value get_column_value(std::vector<Column> columns, RecordData record_data, Column column);
 
+    void set_column_value(std::vector<Column> columns, RecordData &record_data, Column column, Value value);
+
     Frontend::Table from_RecordSet_to_Table(RecordSet record_set);
 
     RecordSet search_whole_table(std::string table_name);
@@ -46,9 +48,11 @@ public:
 
     void insert_record(std::string table_name, std::vector<Value> values);
 
-    void delete_record(std::string table_name, std::vector<WhereClause> where_clauses);
-
     RecordSet search(SelectStmt select_stmt);
 
     void search_entry(SelectStmt select_stmt);
+
+    void delete_record(std::string table_name, std::vector<WhereClause> where_clauses);
+
+    void update_record(std::string table_name, std::vector<std::string> column_names, std::vector<Value> update_values, std::vector<WhereClause> where_clauses);
 };

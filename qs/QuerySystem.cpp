@@ -14,6 +14,9 @@ std::string QuerySystem::from_Value_to_string(Value value){
         case Value::Type::INT:
             return std::to_string(value.asInt());
             break;
+        case Value::Type::FLOAT:
+            return std::to_string(value.asFloat());
+            break;
     }
 }
 
@@ -123,6 +126,51 @@ Value QuerySystem::get_column_value(std::vector<Column> columns, RecordData reco
     return record_data.values[cnt];
 }
 
+void QuerySystem::set_column_value(std::vector<Column> columns, RecordData &record_data, Column column, Value value){
+    int cnt = 0;
+    bool is_exist = false;
+    for(auto col : columns){
+        if (col == column){
+            is_exist = true;
+            break; 
+        }
+        cnt ++;
+    }
+    if (!is_exist){
+        ms.frontend->error("column value is not exist");
+        flag = false;
+        return;
+    }
+    if (value.type == Value::Type::NUL){
+        record_data.values[cnt] = value;
+        return;
+    }
+    else{
+        auto exp_type = ms.get_column_info(column.table_name, column.column_name).type;
+        bool is_valid = true;
+        switch (exp_type){
+            case Field::Type::STR :
+                if (value.type != Value::Type::STR) is_valid = false;
+                break;
+            case Field::Type::INT :
+                if (value.type != Value::Type::INT) is_valid = false;
+                break;
+            case Field::Type::FLOAT :
+                if (value.type != Value::Type::FLOAT) is_valid = false;
+                break;
+            default:
+                assert(false);
+                break;
+        }
+        if (!is_valid){
+            ms.frontend->error("update value's type is not expected");
+            flag = false;
+            return;
+        }
+        record_data.values[cnt] = value;
+    }
+}
+
 Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
     Frontend::Table table;
     table.clear();
@@ -141,7 +189,8 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
 
 void QuerySystem::insert_record(std::string table_name, std::vector<Value> values){
     if (!ms.is_table_exist(table_name)){
-        printf("Error: table is not exist!\n");
+        ms.frontend->error("table is not exist!");
+        flag = false;
         return;
     }
     //  TODO: 调用系统管理模块接口，处理完整性检查
@@ -478,6 +527,30 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
                 index_file->delete_record(key, rid);
             }
         }
+    }
+}
+
+void QuerySystem::update_record(std::string table_name, std::vector<std::string> column_names, std::vector<Value> update_values, std::vector<WhereClause> where_clauses){
+    //  构造查找语句，查询所有满足更改条件的记录
+    SelectStmt select_stmt;
+    select_stmt.table_names.push_back(table_name);
+    select_stmt.where_clauses = where_clauses;
+    auto result = search(select_stmt);
+    //  删除原先的记录
+    delete_record(table_name, where_clauses);
+    //  加入这些记录更改后
+    for(auto record : result.record){
+        auto new_record = record;
+        int cnt = 0;
+        for(auto col_name : column_names){
+            Column col;
+            col.table_name = table_name;
+            col.column_name = col_name;
+            set_column_value(result.columns, new_record, col, update_values[cnt]);
+            cnt ++;
+        }
+        //  更改完毕，插入
+        insert_record(table_name, new_record.values);
     }
 }
 

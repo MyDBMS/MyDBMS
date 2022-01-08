@@ -684,7 +684,8 @@ void IndexFile::delete_record_range(int lower_bound, int upper_bound){
 }
 
 void IndexFile::update_record(int old_key, const RID &old_rid, int new_key, const RID &new_rid){
-    
+    delete_record(old_key, old_rid);
+    insert_record(new_key, new_rid);
 }
 
 void IndexFile::close() {

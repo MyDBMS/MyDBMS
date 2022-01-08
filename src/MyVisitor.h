@@ -284,6 +284,27 @@ public:
         return res;
     }
 
+    virtual antlrcpp::Any visitUpdate_table(SQLParser::Update_tableContext *ctx) override {
+        auto res = visitChildren(ctx);
+        std::string table_name = ctx->Identifier()->getText();
+        auto column_names = ctx->set_clause()->column_names;
+        auto values = ctx->set_clause()->values;
+        auto where_clauses = ctx->where_and_clause()->where_clauses;
+        qs.update_record(table_name, column_names, values, where_clauses);
+        return res;
+    }
+
+    virtual antlrcpp::Any visitSet_clause(SQLParser::Set_clauseContext *ctx) override {
+        auto res = visitChildren(ctx);
+        ctx->column_names.clear();
+        ctx->values.clear();
+        for(auto ident : ctx->Identifier())
+            ctx->column_names.push_back(ident->getText());
+        for(auto value_ctx : ctx->value())
+            ctx->values.push_back(value_ctx->value);
+        return res;
+    }
+
     virtual antlrcpp::Any visitSelect_table_(SQLParser::Select_table_Context *ctx) override {
         auto res = visitChildren(ctx);
         qs.search_entry(ctx->select_table()->select_stmt);

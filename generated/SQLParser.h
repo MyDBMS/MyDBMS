@@ -671,6 +671,9 @@ public:
     std::vector<ValueContext *> value();
     ValueContext* value(size_t i);
 
+    std::vector<std::string> column_names;
+    std::vector<Value> values;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
