@@ -3,11 +3,13 @@
 std::string Frontend::read_stmt() {
     char ch;
     std::string s;
+    bool in_str = false;
     while (true) {
         ch = read_char();
         if (ch == EOF) return "EXIT;";
         if (!(s.empty() && (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t'))) s += ch;
-        if (ch == ';') return s;
+        if (ch == '\'') in_str = !in_str;
+        if (!in_str && ch == ';') return s;
     }
 }
 
