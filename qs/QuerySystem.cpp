@@ -264,12 +264,14 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
     // TODO: 多个合法，找一个表的列数最多的
     for(auto where_clause : where_clauses){
         auto column = where_clause.column;
-        l = lb[column.table_name + "_" + column.column_name];
-        r = ub[column.table_name + "_" + column.column_name];
-        if (l <= r){
-            is_use_index = true;
-            index_column = column;
-            break;
+        if (lb.find(column.table_name + "_" + column.column_name) != lb.end()){
+            l = lb[column.table_name + "_" + column.column_name];
+            r = ub[column.table_name + "_" + column.column_name];
+            if (l <= r){
+                is_use_index = true;
+                index_column = column;
+                break;
+            }
         }
     }
     RecordSet init_result;  //  初始没有列，有一条记录（为了 join )
