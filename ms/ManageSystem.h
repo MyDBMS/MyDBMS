@@ -75,9 +75,9 @@ class ManageSystem {
 
     void update_table_mapping_file(std::size_t db_id);
 
-    std::size_t find_table_by_name(const std::string &table_name);
+    std::size_t find_table_by_name(const std::string &table_name, bool no_assert = false);
 
-    std::size_t find_column_by_name(std::size_t table_loc, const std::string &column_name);
+    std::size_t find_column_by_name(std::size_t table_loc, const std::string &column_name, bool no_assert = false);
 
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
@@ -97,7 +97,9 @@ public:
 
     void use_db(const std::string &db_name);
 
-    void create_table(const std::string &table_name, const std::vector<Field> &field_list);
+    void create_table(const std::string &table_name, const std::vector<Field> &field_list,
+                      const std::vector<PrimaryField> &primary_field_list,
+                      const std::vector<ForeignField> &foreign_field_list);
 
     void drop_table(const std::string &table_name);
 
@@ -116,6 +118,10 @@ public:
     bool is_index_exist(const std::string &table_name, const std::string &column_name);
 
     std::string get_column_name(const std::string &table_name, std::size_t column_id);
+
+    bool is_column_exist(const std::string &table_name, const std::string &column_name);
+
+    Field get_column_info(const std::string &table_name, const std::string &column_name);
 
     bool is_table_exist(const std::string &table_name);
 

@@ -56,6 +56,26 @@ Value::Value(const Value &rhs) : str_len(rhs.str_len), type(rhs.type) {
     }
 }
 
+Value& Value::operator=(const Value& rhs){
+    str_len = rhs.str_len;
+    type = rhs.type;
+    switch (rhs.type) {
+        case NUL:
+            data = nullptr;
+            break;
+        case STR:
+            data = (void *) new char[rhs.str_len + 1];
+            strcpy((char *) data, (char *) rhs.data);
+            break;
+        case INT:
+            data = (void *) new int(*(int *) rhs.data);
+            break;
+        default:
+            assert(false);
+    }
+    return *this;
+}
+
 Value::~Value() {
     switch (type) {
         case NUL:

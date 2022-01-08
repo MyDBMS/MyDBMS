@@ -22,8 +22,21 @@ INSERT INTO student VALUES (292, 3, 'sunxun');
 
 INSERT INTO student VALUES (300, 5, 'xuchenxi');
 
+SELECT * FROM student;
+
 SELECT * FROM student WHERE student.id = 228;
 
 SELECT * FROM student WHERE student.uid = 5;
+
+CREATE TABLE teacher (
+    id INT NOT NULL,
+    name VARCHAR(20)
+);
+
+INSERT INTO teacher VALUES (120, 'cuiyong');
+
+INSERT INTO teacher VALUES (150, 'fengjianhua');
+
+SELECT student.uid, student.name, teacher.name FROM student, teacher WHERE student.uid = 5 AND teacher.name <> 'fengjianhua';
 
 EXIT;

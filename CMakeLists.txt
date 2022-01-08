@@ -26,7 +26,7 @@ set(RS_SRC rs/RecordSystem.cpp rs/RecordSystem.h rs/RecordFile.cpp rs/RecordFile
 
 set(IS_SRC is/IndexSystem.cpp is/IndexSystem.h is/IndexFile.cpp is/IndexFile.h is/IndexFileMeta.h is/IndexPageHeader.h)
 
-set(QS_SRC qs/QuerySystem.cpp qs/QuerySystem.h)
+set(QS_SRC qs/QuerySystem.cpp qs/QuerySystem.h qs/SelectStmt.h qs/SelectStmt.cpp qs/WhereClause.h qs/WhereClause.cpp qs/SelectStmt.h qs/Selector.h qs/Column.h qs/Column.cpp qs/RecordSet.h qs/RecordSet.cpp)
 
 set(MS_SRC ms/ManageSystem.cpp ms/ManageSystem.h ms/DatabaseMapping.h ms/TableMapping.h ms/Field.h ms/Value.h ms/Value.cpp)
 

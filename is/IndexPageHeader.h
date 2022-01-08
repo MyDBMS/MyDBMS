@@ -4,7 +4,7 @@
 
 #define INDEX_PAGE_HEADER_SIZE 64
 
-#define INDEX_ID_MAX 100000000
+#define INDEX_KEY_MAX 100000000
 
 /**
  * 用于描述索引文件中数据页的页头。

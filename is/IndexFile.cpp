@@ -564,7 +564,7 @@ std::size_t IndexFile::create_node(int is_leaf, int parent, int pre_leaf, int su
     header->pre_leaf = pre_leaf;
     header->suc_leaf = suc_leaf;
     page->dirty = true;
-    int inf = INDEX_ID_MAX;
+    int inf = INDEX_KEY_MAX;
     set_key(page, 0, inf);
     set_pre_key_id(page, 0, 0);
     set_suc_key_id(page, 0, 0);

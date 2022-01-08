@@ -46,7 +46,7 @@ void ManageSystem::update_table_mapping_file(std::size_t db_id) {
     fclose(table_mapping_file);
 }
 
-std::size_t ManageSystem::find_table_by_name(const std::string &table_name) {
+std::size_t ManageSystem::find_table_by_name(const std::string &table_name, bool no_assert) {
     assert(current_db.valid);
 
     auto &map = table_mapping_map[current_db.id];
@@ -56,10 +56,13 @@ std::size_t ManageSystem::find_table_by_name(const std::string &table_name) {
         }
     }
 
+    if (no_assert) {
+        return map.count;
+    }
     assert(false);
 }
 
-std::size_t ManageSystem::find_column_by_name(std::size_t table_loc, const std::string &column_name) {
+std::size_t ManageSystem::find_column_by_name(std::size_t table_loc, const std::string &column_name, bool no_assert) {
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     for (std::size_t i = 0; i < info.field_count; ++i) {
         if (info.fields[i].column_name == column_name) {
@@ -67,6 +70,9 @@ std::size_t ManageSystem::find_column_by_name(std::size_t table_loc, const std::
         }
     }
 
+    if (no_assert) {
+        return info.field_count;
+    }
     assert(false);
 }
 
@@ -228,7 +234,9 @@ void ManageSystem::use_db(const std::string &db_name) {
     frontend->info("Database changed.");
 }
 
-void ManageSystem::create_table(const std::string &table_name, const std::vector<Field> &field_list) {
+void ManageSystem::create_table(const std::string &table_name, const std::vector<Field> &field_list,
+                                const std::vector<PrimaryField> &primary_field_list,
+                                const std::vector<ForeignField> &foreign_field_list) {
     if (table_name.empty() || table_name.length() > MAX_TABLE_NAME_LEN) {
         frontend->error("Tb name shall be neither empty nor longer than " + std::to_string(MAX_TABLE_NAME_LEN) + ".");
         return;
@@ -275,7 +283,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
             case Field::STR:
                 fixed_size += 2;
                 var_cnt += 1;
-                strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
                 table_info_field.type = Field::STR;
                 table_info_field.str_len = f.str_len;
                 table_info_field.nullable = f.nullable;
@@ -284,7 +291,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
             case Field::INT:
                 fixed_size += 4;
                 var_cnt += 0;
-                strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
                 table_info_field.type = Field::INT;
                 table_info_field.str_len = 0;
                 table_info_field.nullable = f.nullable;
@@ -293,6 +299,11 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
             default:
                 break;
         }
+
+        strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
+        table_info_field.nullable = f.nullable;
+        table_info_field.indexed = false;
+
         ++table_info.field_count;
     }
     table_info.fixed_size = fixed_size;
@@ -485,7 +496,7 @@ char *ManageSystem::from_record_to_bytes(const std::string &table_name, const st
             case Value::STR:
                 memcpy(buffer + var_data_pos, v.asString().c_str(), v.asString().length());
                 var_data_pos += v.asString().length();
-                *(uint16_t * )(buffer + var_info_pos) = var_data_pos;
+                *(uint16_t *) (buffer + var_info_pos) = var_data_pos;
                 var_info_pos += 2;
                 break;
             case Value::INT:
@@ -518,7 +529,7 @@ std::vector<Value> ManageSystem::from_bytes_to_record(const std::string &table_n
         auto f = info.fields[i];
         switch (f.type) {
             case Field::STR: {
-                std::size_t var_data_end_pos = *(uint16_t * )(buffer + var_info_pos);
+                std::size_t var_data_end_pos = *(uint16_t *) (buffer + var_info_pos);
                 char value[var_data_end_pos - var_data_pos + 1];
                 if (var_data_end_pos - var_data_pos > 0) {
                     memcpy(value, buffer + var_data_pos, var_data_end_pos - var_data_pos);
@@ -565,6 +576,27 @@ bool ManageSystem::is_index_exist(const std::string &table_name, const std::stri
 std::string ManageSystem::get_column_name(const std::string &table_name, std::size_t column_id) {
     std::size_t table_id = find_table_by_name(table_name);
     return find_column_by_id(table_id, column_id);
+}
+
+bool ManageSystem::is_column_exist(const std::string &table_name, const std::string &column_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    return find_column_by_name(table_id, column_name, true) !=
+           table_mapping_map[current_db.id].mapping[table_id].field_count;
+}
+
+Field ManageSystem::get_column_info(const std::string &table_name, const std::string &column_name) {
+    std::size_t table_id = find_table_by_name(table_name);
+    std::size_t column_id = find_column_by_name(table_id, column_name);
+    auto info = table_mapping_map[current_db.id].mapping[table_id].fields[column_id];
+    return {
+        /* name */      info.column_name,
+        /* type */      info.type,
+        /* str_len */   info.str_len,
+        /* nullable */  info.nullable,
+        /* def_int */   0,
+        /* def_float */ 0,
+        /* def_str */   "",
+    };
 }
 
 bool ManageSystem::is_table_exist(const std::string &table_name) {

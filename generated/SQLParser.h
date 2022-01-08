@@ -6,7 +6,7 @@
 
 #include "antlr4-runtime.h"
 
-#include "../ms/ManageSystem.h"
+#include "../qs/QuerySystem.h"
 
 
 
@@ -217,6 +217,9 @@ public:
 
     virtual size_t getRuleIndex() const override;
 
+    bool is_select;
+    SelectStmt select_stmt;
+
    
   };
 
@@ -300,6 +303,8 @@ public:
     ColumnContext *column();
     std::vector<antlr4::tree::TerminalNode *> Integer();
     antlr4::tree::TerminalNode* Integer(size_t i);
+
+    SelectStmt select_stmt;
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -495,6 +500,8 @@ public:
     std::vector<ValueContext *> value();
     ValueContext* value(size_t i);
 
+    std::vector<Value> value_list;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -511,6 +518,8 @@ public:
     antlr4::tree::TerminalNode *Float();
     antlr4::tree::TerminalNode *Null();
 
+    Value value;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -524,6 +533,8 @@ public:
     virtual size_t getRuleIndex() const override;
     std::vector<Where_clauseContext *> where_clause();
     Where_clauseContext* where_clause(size_t i);
+
+    std::vector<WhereClause> where_clauses;
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -542,11 +553,7 @@ public:
 
     virtual size_t getRuleIndex() const override;
 
-    int wc_type;
-
-    std::string column_name;
-
-    int key;
+    WhereClause where_clause;
 
    
   };
@@ -622,6 +629,8 @@ public:
     std::vector<antlr4::tree::TerminalNode *> Identifier();
     antlr4::tree::TerminalNode* Identifier(size_t i);
 
+    Column column;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -635,6 +644,8 @@ public:
     virtual size_t getRuleIndex() const override;
     ValueContext *value();
     ColumnContext *column();
+
+    Expr expr;
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -668,6 +679,8 @@ public:
     std::vector<SelectorContext *> selector();
     SelectorContext* selector(size_t i);
 
+    std::vector<Selector> selectors;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -683,6 +696,8 @@ public:
     AggregatorContext *aggregator();
     antlr4::tree::TerminalNode *Count();
 
+    Selector selector;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
@@ -696,6 +711,8 @@ public:
     virtual size_t getRuleIndex() const override;
     std::vector<antlr4::tree::TerminalNode *> Identifier();
     antlr4::tree::TerminalNode* Identifier(size_t i);
+
+    std::vector<std::string> idents;
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
@@ -714,6 +731,8 @@ public:
     antlr4::tree::TerminalNode *Greater();
     antlr4::tree::TerminalNode *GreaterEqual();
     antlr4::tree::TerminalNode *NotEqual();
+
+    WhereClause::OP_Type op_type;
 
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;

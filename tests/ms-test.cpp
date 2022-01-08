@@ -3,6 +3,7 @@
 #define SYSTEM_ROOT ("bin/root")
 #define DB_NAME ("test_db")
 #define TABLE_NAME ("test_table")
+#define FOREIGN_TABLE_NAME ("foreign_tb")
 
 void test_value() {
     {
@@ -60,11 +61,21 @@ void test_ms() {
     ms.create_db(DB_NAME);
     ms.use_db(DB_NAME);
 
+    ms.create_table(FOREIGN_TABLE_NAME, {{"f", Field::INT, 0, false}}, {}, {});
+
     std::vector<Field> fields;
     fields.push_back(Field{"a", Field::INT, 0, false});
     fields.push_back(Field{"b", Field::STR, 5, false});
     fields.push_back(Field{"c", Field::INT, 0, false});
-    ms.create_table(TABLE_NAME, fields);
+    fields.push_back(Field{"d", Field::FLOAT, 0, false});
+
+    std::vector<PrimaryField> primary_fields;
+    primary_fields.push_back({"test_pk", {"c"}});
+
+    std::vector<ForeignField> foreign_fields;
+    foreign_fields.push_back({"foreign", {"a"}, FOREIGN_TABLE_NAME, {"f"}});
+
+    ms.create_table(TABLE_NAME, fields, primary_fields, foreign_fields);
 
     // validate insert data
     {
@@ -178,9 +189,10 @@ void test_ms() {
 +-------------------+
 | Tables_in_test_db |
 +-------------------+
+| foreign_tb        |
 | test_table        |
 +-------------------+
-1 row in set
+2 rows in set
 )";
         assert(oss.str() == expected);
     }
