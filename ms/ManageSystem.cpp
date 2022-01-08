@@ -1,4 +1,5 @@
 #include "ManageSystem.h"
+#include "../qs/QuerySystem.h"
 #include "TableMapping.h"
 #include <cstring>
 
@@ -147,13 +148,17 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
     auto &foreign_table = table_mapping.mapping[foreign_table_loc];
     table_info_field.foreign_table_id = foreign_table.id;
     table_info_field.foreign_column_bitmap = 0;
-    for (const auto &column_name: f.foreign_columns) {
-        auto column_id = find_column_by_name(foreign_table_loc, column_name, true);
-        if (column_id == table_info.field_count) {
-            frontend->warning("In foreign restriction, column name of " + column_name + " cannot be found.");
+    for (int i = 0; i < f.columns.size(); ++i) {
+        const auto &column_name = f.columns[i];
+        const auto &foreign_column_name = f.foreign_columns[i];
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        auto foreign_column_id = find_column_by_name(foreign_table_loc, foreign_column_name, true);
+        if (foreign_column_id == table_info.field_count) {
+            frontend->warning("In foreign restriction, column name of " + foreign_column_name + " cannot be found.");
             return false;
         }
-        table_info_field.foreign_column_bitmap |= (1u << column_id);
+        table_info_field.foreign_column_bitmap |= (1u << foreign_column_id);
+        table_info_field.foreign_column_ids[column_id] = foreign_column_id;
     }
     bool exist = false;
     for (std::size_t i = 0; i < foreign_table.related_table_count; ++i) {
@@ -384,7 +389,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
                 var_cnt += 1;
                 table_info_field.type = Field::STR;
                 table_info_field.str_len = f.str_len;
-                strcpy(table_info_field.def_str, f.def_str.c_str());
+                strcpy(table_info_field.def_str, f.def_str.substr(0, MAX_DEFAULT_STR_LEN).c_str());
                 if (f.def_str.length() > MAX_DEFAULT_STR_LEN) {
                     frontend->warning("Default string of field " + f.name + " is over long!");
                     break;
@@ -544,10 +549,10 @@ void ManageSystem::describe_table(const std::string &table_name) {
         auto foreign_table = table_mapping_map[current_db.id].mapping[find_table_by_id(f.foreign_table_id)];
         foreign_msg += foreign_table.name;
         l_par_printed = false;
-        for (int c = 0; c < foreign_table.field_count; ++c) {
-            if ((f.foreign_column_bitmap >> c) & 1) {
-                foreign_msg += (l_par_printed ? ", " : "(");
-                foreign_msg += foreign_table.fields[c].column_name;
+        for (int c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                foreign_msg += (l_par_printed ? ", " : "(");;
+                foreign_msg += foreign_table.fields[f.foreign_column_ids[c]].column_name;
                 l_par_printed = true;
             }
         }
@@ -772,52 +777,90 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
         }
     }
 
-    // TODO: unique
-
-    // Primary key restriction
-    auto record_file = get_record_file(table_name);
-    std::size_t length_limit = get_record_length_limit(table_name);
-    auto buffer = new char[length_limit + 5];
-    for (std::size_t i = 0; i < info.primary_field_count; ++i) {
-        auto &f = info.primary_fields[i];
-        std::vector<std::size_t> restricted;
-        for (std::size_t c = 0; c < info.field_count; ++c) {
-            if ((f.column_bitmap >> c) & 1) {
-                restricted.push_back(c);
+    // Unique restriction
+    for (std::size_t i = 0; i < info.field_count; ++i) {
+        if (info.fields[i].unique) {
+            WhereClause clause;
+            Column column;
+            Expr expr;
+            column.table_name = table_name;
+            column.column_name = info.fields[i].column_name;
+            clause.type = WhereClause::OP_EXPR;
+            clause.column = column;
+            clause.op_type = WhereClause::EQ;
+            expr.type = Expr::VALUE;
+            expr.value = values[i];
+            expr.column = column;
+            clause.expr = expr;
+            SelectStmt stmt;
+            stmt.table_names.push_back(table_name);
+            stmt.where_clauses.push_back(clause);
+            if (!qs->search(stmt).record.empty()) {
+                return UNIQUE_RESTRICTION_FAIL;
             }
         }
+    }
 
-        for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
-            std::size_t length = record_file->get_record(rid, buffer);
-            auto record = from_bytes_to_record(table_name, buffer, length);
-            bool match = true;
-            for (const auto &c: restricted) {
-                if (record[c] != values[c]) {
-                    match = false;
-                    break;
-                }
+    // Primary key restriction
+    for (std::size_t i = 0; i < info.primary_field_count; ++i) {
+        auto &f = info.primary_fields[i];
+        SelectStmt stmt;
+        stmt.table_names.push_back(table_name);
+        for (std::size_t c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                WhereClause clause;
+                Column column;
+                Expr expr;
+                column.table_name = table_name;
+                column.column_name = info.fields[c].column_name;
+                clause.type = WhereClause::OP_EXPR;
+                clause.column = column;
+                clause.op_type = WhereClause::EQ;
+                expr.type = Expr::VALUE;
+                expr.value = values[c];
+                expr.column = column;
+                clause.expr = expr;
+                stmt.where_clauses.push_back(clause);
             }
-            if (match) {
-                delete[] buffer;
-                return PRIMARY_RESTRICTION_FAIL;
-            }
+        }
+        if (!qs->search(stmt).record.empty()) {
+            return PRIMARY_RESTRICTION_FAIL;
         }
     }
 
     // Foreign key restriction
     for (std::size_t i = 0; i < info.foreign_field_count; ++i) {
         auto &f = info.foreign_fields[i];
-        std::vector<std::size_t> restricted;
+        SelectStmt stmt;
+        std::size_t foreign_table_loc = find_table_by_id(f.foreign_table_id, true);
+        if (foreign_table_loc == table_mapping_map[current_db.id].count) {
+            frontend->warning("Internal warning: checking foreign constraint with non-existing table.");
+        }
+        auto &foreign_info = table_mapping_map[current_db.id].mapping[foreign_table_loc];
+        stmt.table_names.emplace_back(foreign_info.name);
+
         for (std::size_t c = 0; c < info.field_count; ++c) {
             if ((f.column_bitmap >> c) & 1) {
-                restricted.push_back(c);
+                WhereClause clause;
+                Column column;
+                Expr expr;
+                column.table_name = foreign_info.name;
+                column.column_name = foreign_info.fields[f.foreign_column_ids[c]].column_name;
+                clause.type = WhereClause::OP_EXPR;
+                clause.column = column;
+                clause.op_type = WhereClause::EQ;
+                expr.type = Expr::VALUE;
+                expr.value = values[c];
+                expr.column = column;
+                clause.expr = expr;
+                stmt.where_clauses.push_back(clause);
             }
         }
 
-        // TODO
+        if (qs->search(stmt).record.empty()) {
+            return INSERT_FOREIGN_RESTRICTION_FAIL;
+        }
     }
-
-    delete[] buffer;
     return NONE;
 }
 

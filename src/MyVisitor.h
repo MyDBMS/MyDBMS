@@ -12,6 +12,7 @@ public:
     ManageSystem &ms;
 
     explicit MyVisitor(ManageSystem &ms): ms(ms), qs(ms) {
+        ms.qs = &qs;
     }
     
     Value gen_Value(SQLParser::ValueContext *ctx){
@@ -149,11 +150,11 @@ public:
     virtual antlrcpp::Any visitForeign_key_field(SQLParser::Foreign_key_fieldContext *ctx) override {
         auto res = visitChildren(ctx);
         ForeignField field;
-        field.name = ctx->Identifier(0) == nullptr ? "" : ctx->Identifier(0)->getText();
+        field.name = ctx->Identifier(1) == nullptr ? "" : ctx->Identifier(0)->getText();
         for (const auto &id : ctx->identifiers(0)->Identifier()) {
             field.columns.push_back(id->getText());
         }
-        field.foreign_table_name = ctx->Identifier(1)->getText();
+        field.foreign_table_name = ctx->Identifier(1) == nullptr ? ctx->Identifier(0)->getText() : ctx->Identifier(1)->getText();
         for (const auto &id : ctx->identifiers(1)->Identifier()) {
             field.foreign_columns.push_back(id->getText());
         }
@@ -208,7 +209,7 @@ public:
         auto res = visitChildren(ctx);
         std::string table_name = ctx->Identifier(0)->getText();
         std::string constraint_name = ctx->Identifier(1)->getText();
-        std::string foreign_table_name = ctx->Identifier(1)->getText();
+        std::string foreign_table_name = ctx->Identifier(2)->getText();
         std::vector<std::string> identifiers;
         for (const auto &it : ctx->identifiers(0)->Identifier()) {
             identifiers.push_back(it->getText());

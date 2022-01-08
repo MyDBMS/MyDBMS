@@ -4,13 +4,13 @@
 #include "Field.h"
 
 #define MAX_TABLE_COUNT 10
-#define MAX_TABLE_NAME_LEN 10
+#define MAX_TABLE_NAME_LEN 32
 #define MAX_COLUMN_COUNT 10
-#define MAX_COLUMN_NAME_LEN 10
-#define MAX_DEFAULT_STR_LEN 10
-#define MAX_PRIMARY_RESTRICTION_LEN 10
+#define MAX_COLUMN_NAME_LEN 32
+#define MAX_DEFAULT_STR_LEN 32
+#define MAX_PRIMARY_RESTRICTION_LEN 32
 #define MAX_PRIMARY_FIELD_COUNT 10
-#define MAX_FOREIGN_RESTRICTION_LEN 10
+#define MAX_FOREIGN_RESTRICTION_LEN 32
 #define MAX_FOREIGN_FIELD_COUNT 10
 
 struct TableMapping {
@@ -45,6 +45,7 @@ struct TableMapping {
             u_int16_t column_bitmap{};
             std::size_t foreign_table_id{};
             u_int16_t foreign_column_bitmap{};
+            std::size_t foreign_column_ids[MAX_COLUMN_COUNT]{};
         } foreign_fields[MAX_FOREIGN_FIELD_COUNT];
         std::size_t related_table_count{};
         std::size_t related_table_ids[MAX_TABLE_COUNT]{};

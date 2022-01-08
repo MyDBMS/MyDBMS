@@ -10,6 +10,8 @@
 #include "../utils/Error.h"
 #include "../utils/Frontend.h"
 
+class QuerySystem;
+
 class ManageSystem {
     /**
      * 数据库系统根目录，包含 base 和 global 两个目录。
@@ -90,6 +92,8 @@ class ManageSystem {
 public:
 
     const Frontend *frontend;
+
+    QuerySystem *qs;
 
     static ManageSystem load_system(const std::string &root_dir, const Frontend *frontend);
 
