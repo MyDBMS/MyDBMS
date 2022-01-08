@@ -337,9 +337,37 @@ public:
 
     virtual antlrcpp::Any visitSelector(SQLParser::SelectorContext *ctx) override {
         auto res = visitChildren(ctx);
-        if (ctx->column()){  // 直接投影一列
+        if (ctx->Count()){
+            ctx->selector.type = Selector::Type::CT;
+        }
+        else if (ctx->aggregator()){
+            ctx->selector.type = Selector::Type::AGR_COL;
+            ctx->selector.agr_type = ctx->aggregator()->agr_type;
+            ctx->selector.col = ctx->column()->column;
+        }
+        else{
             ctx->selector.type = Selector::Type::COL;
             ctx->selector.col = ctx->column()->column;
+        }
+        return res;
+    }
+
+    virtual antlrcpp::Any visitAggregator(SQLParser::AggregatorContext *ctx) override {
+        auto res = visitChildren(ctx);
+        if (ctx->Count()){
+            ctx->agr_type = Selector::Aggregator_Type::COUNT;
+        }
+        else if (ctx->Average()){
+            ctx->agr_type = Selector::Aggregator_Type::AVERAGE;
+        }
+        else if (ctx->Max()){
+            ctx->agr_type = Selector::Aggregator_Type::MAX;
+        }
+        else if (ctx->Min()){
+            ctx->agr_type = Selector::Aggregator_Type::MIN;
+        }
+        else if (ctx->Sum()){
+            ctx->agr_type = Selector::Aggregator_Type::SUM;
         }
         return res;
     }

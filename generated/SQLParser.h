@@ -760,6 +760,8 @@ public:
     antlr4::tree::TerminalNode *Min();
     antlr4::tree::TerminalNode *Sum();
 
+    Selector::Aggregator_Type agr_type;
+
 
     virtual antlrcpp::Any accept(antlr4::tree::ParseTreeVisitor *visitor) override;
    
