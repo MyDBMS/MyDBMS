@@ -3,15 +3,15 @@
 #include <string>
 #include "Field.h"
 
-#define MAX_TABLE_COUNT 10
+#define MAX_TABLE_COUNT 20
 #define MAX_TABLE_NAME_LEN 32
-#define MAX_COLUMN_COUNT 10
+#define MAX_COLUMN_COUNT 20
 #define MAX_COLUMN_NAME_LEN 32
 #define MAX_DEFAULT_STR_LEN 32
 #define MAX_PRIMARY_RESTRICTION_LEN 32
-#define MAX_PRIMARY_FIELD_COUNT 10
+#define MAX_PRIMARY_FIELD_COUNT 20
 #define MAX_FOREIGN_RESTRICTION_LEN 32
-#define MAX_FOREIGN_FIELD_COUNT 10
+#define MAX_FOREIGN_FIELD_COUNT 20
 
 struct TableMapping {
     std::size_t db_id{};
