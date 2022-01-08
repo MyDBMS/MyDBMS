@@ -1,4 +1,5 @@
 #include "../ms/ManageSystem.h"
+#include "QuerySystem.h"
 
 #define SYSTEM_ROOT ("bin/root")
 #define DB_NAME ("test_db")
@@ -68,10 +69,14 @@ void test_value() {
 void test_ms() {
     std::stringstream iss, oss;
     ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StringStreamFrontend(iss, oss));
+    QuerySystem qs{ms};
+    ms.qs = &qs;
     ms.create_db(DB_NAME);
     ms.use_db(DB_NAME);
 
-    ms.create_table(FOREIGN_TABLE_NAME, {{"f", Field::INT, 0, false}}, {}, {});
+    ms.create_table(FOREIGN_TABLE_NAME, {{"e", Field::INT, 0, false},
+                                         {"f", Field::INT, 0, false}}, {}, {});
+    qs.insert_record(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(3)});
 
     std::vector<Field> fields;
     fields.push_back(Field{"a", Field::INT, 0, false});
@@ -137,7 +142,7 @@ void test_ms() {
         values.push_back(Value::make_value("xyz"));
         values.push_back(Value::make_value(0));
         values.push_back(Value::make_value(1.0f));
-        assert(ms.validate_insert_data(TABLE_NAME, values) == Error::NONE);
+        assert(ms.validate_insert_data(TABLE_NAME, values) == Error::INSERT_FOREIGN_RESTRICTION_FAIL);
     }
 
     // test comparison

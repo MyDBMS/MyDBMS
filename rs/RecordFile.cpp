@@ -97,7 +97,7 @@ std::pair<std::size_t, u_int16_t> RecordFile::vacancy_at(BufferPage *page, std::
                     return std::make_pair(0, 0);
                 }
                 // 前一条记录有效，根据语义，需要将 slot_offset 调整为前一条记录的末尾地址
-                u_int16_t last_record_size = *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
+                u_int16_t last_record_size = meta.var_cnt == 0 ? meta.fixed_size : *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
                 slot_offset += last_record_size;
             } else {
                 // 当前记录已经在最开始
@@ -176,7 +176,7 @@ std::size_t RecordFile::get_record(const RID &rid, char *record) {
     u_int16_t slot_offset = get_slot_offset(page, rid.slot_id);
     assert(slot_offset != 0);
 
-    u_int16_t record_size = *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
+    u_int16_t record_size = meta.var_cnt == 0 ? meta.fixed_size : *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2));
     memcpy(record, page->data + slot_offset, record_size);
     return record_size;
 }
@@ -190,7 +190,7 @@ RID RecordFile::insert_record(std::size_t record_size, const char *record) {
     page->dirty = true;
     u_int16_t slot_offset = get_slot_offset(page, rid.slot_id);
     memcpy(page->data + slot_offset, record, record_size);
-    assert(*((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2)) == record_size);
+    assert((meta.var_cnt == 0 ? meta.fixed_size : *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2))) == record_size);
 
     // 维护页头部空闲空间信息
     fix_page_header(page);
@@ -220,7 +220,7 @@ RID RecordFile::update_record(const RID &rid, std::size_t record_size, const cha
     if (record_size <= std::get<0>(vacancy_info = vacancy_at(page, rid.slot_id))) {
         u_int16_t slot_offset = std::get<1>(vacancy_info);
         memcpy(page->data + slot_offset, record, record_size);
-        assert(*((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2)) == record_size);
+        assert((meta.var_cnt == 0 ? meta.fixed_size : *((u_int16_t *) (page->data + slot_offset + meta.fixed_size - 2))) == record_size);
         return rid;
     } else {
         delete_record(rid);

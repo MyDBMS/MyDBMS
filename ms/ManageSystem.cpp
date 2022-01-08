@@ -168,7 +168,7 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
         }
     }
     if (!exist) {
-        foreign_table.related_table_ids[foreign_table.related_table_count++] = table_mapping.count;
+        foreign_table.related_table_ids[foreign_table.related_table_count++] = table_loc;
     }
     return true;
 }
@@ -876,6 +876,49 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
         }
     }
     return NONE;
+}
+
+Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_name, const std::vector<Value> &values) {
+    using namespace Error;
+
+    std::size_t table_loc = find_table_by_name(table_name, true);
+    if (table_loc == table_mapping_map[current_db.id].count) {
+        return DELETE_TABLE_DOES_NOT_EXIST;
+    }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+
+    // Foreign key restriction
+    for (std::size_t related_table_loc = 0; related_table_loc < table_mapping_map[current_db.id].count; ++related_table_loc) {
+        if (related_table_loc == table_loc) continue;
+        auto &related_table_info = table_mapping_map[current_db.id].mapping[related_table_loc];
+        for (std::size_t i = 0; i < related_table_info.foreign_field_count; ++i) {
+            auto &f = related_table_info.foreign_fields[i];
+            if (f.foreign_table_id != info.id) continue;
+            SelectStmt stmt;
+            stmt.table_names.emplace_back(related_table_info.name);
+            for (std::size_t c = 0; c < related_table_info.field_count; ++c) {
+                if ((f.column_bitmap >> c) & 1) {
+                    WhereClause clause;
+                    Column column;
+                    Expr expr;
+                    column.table_name = related_table_info.name;
+                    column.column_name = related_table_info.fields[c].column_name;
+                    clause.type = WhereClause::OP_EXPR;
+                    clause.column = column;
+                    clause.op_type = WhereClause::EQ;
+                    expr.type = Expr::VALUE;
+                    expr.value = values[f.foreign_column_ids[c]];
+                    expr.column = column;
+                    clause.expr = expr;
+                    stmt.where_clauses.push_back(clause);
+                }
+            }
+            if (!qs->search(stmt).record.empty()) {
+                return DELETE_FOREIGN_RESTRICTION_FAIL;
+            }
+        }
+    }
+    return Error::DELETE_NONE;
 }
 
 char *ManageSystem::from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, size_t &l) {

@@ -12,4 +12,10 @@ namespace Error {
         INSERT_FOREIGN_RESTRICTION_FAIL,
         TABLE_DOES_NOT_EXIST,
     };
+
+    enum DeleteError {
+        DELETE_NONE,
+        DELETE_TABLE_DOES_NOT_EXIST,
+        DELETE_FOREIGN_RESTRICTION_FAIL,
+    };
 }
