@@ -97,6 +97,8 @@ public:
 
     static ManageSystem load_system(const std::string &root_dir, const Frontend *frontend);
 
+    bool ensure_db_valid() const;
+
     void create_db(const std::string &db_name);
 
     void drop_db(const std::string &db_name);

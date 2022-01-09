@@ -48,9 +48,14 @@ void ManageSystem::update_table_mapping_file(std::size_t db_id) {
     fclose(table_mapping_file);
 }
 
-std::size_t ManageSystem::find_table_by_name(const std::string &table_name, bool no_assert) {
-    assert(current_db.valid);
+bool ManageSystem::ensure_db_valid() const {
+    if (!current_db.valid) {
+        frontend->error("DB is not opened yet.");
+    }
+    return current_db.valid;
+}
 
+std::size_t ManageSystem::find_table_by_name(const std::string &table_name, bool no_assert) {
     auto &map = table_mapping_map[current_db.id];
     for (std::size_t i = 0; i < map.count; ++i) {
         if (table_name == map.mapping[i].name) {
@@ -65,8 +70,6 @@ std::size_t ManageSystem::find_table_by_name(const std::string &table_name, bool
 }
 
 std::size_t ManageSystem::find_table_by_id(std::size_t table_id, bool no_assert) {
-    assert(current_db.valid);
-
     auto &map = table_mapping_map[current_db.id];
     for (std::size_t i = 0; i < map.count; ++i) {
         if (table_id == map.mapping[i].id) {
@@ -289,8 +292,7 @@ void ManageSystem::show_dbs() {
 }
 
 void ManageSystem::show_tables() {
-    if (!current_db.valid) {
-        frontend->error("DB is not opened yet.");
+    if (!ensure_db_valid()) {
         return;
     }
 
@@ -303,6 +305,9 @@ void ManageSystem::show_tables() {
 }
 
 void ManageSystem::show_indexes() const {
+    if (!ensure_db_valid()) {
+        return;
+    }
     frontend->error("Bare SHOW INDEXES stmt is not supported!");
 }
 
@@ -333,6 +338,10 @@ void ManageSystem::use_db(const std::string &db_name) {
 void ManageSystem::create_table(const std::string &table_name, const std::vector<Field> &field_list,
                                 const std::vector<PrimaryField> &primary_field_list,
                                 const std::vector<ForeignField> &foreign_field_list) {
+    if (!ensure_db_valid()) {
+        return;
+    }
+
     if (table_name.empty() || table_name.length() > MAX_TABLE_NAME_LEN) {
         frontend->error("Tb name shall be neither empty nor longer than " + std::to_string(MAX_TABLE_NAME_LEN) + ".");
         return;
@@ -340,11 +349,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
     if (db_mapping.count + 1 >= MAX_TABLE_COUNT) {
         frontend->error("No more tables! You promised!");
-        return;
-    }
-
-    if (!current_db.valid) {
-        frontend->error("Db is not opened yet.");
         return;
     }
 
@@ -462,6 +466,9 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 }
 
 void ManageSystem::drop_table(const std::string &table_name) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -496,6 +503,9 @@ void ManageSystem::drop_table(const std::string &table_name) {
 }
 
 void ManageSystem::describe_table(const std::string &table_name) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -589,6 +599,9 @@ void ManageSystem::describe_table(const std::string &table_name) {
 }
 
 void ManageSystem::create_index(const std::string &table_name, const std::vector<std::string> &column_list) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -632,6 +645,9 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
 }
 
 void ManageSystem::drop_index(const std::string &table_name, const std::vector<std::string> &column_list) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -661,6 +677,9 @@ void ManageSystem::drop_index(const std::string &table_name, const std::vector<s
 }
 
 void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryField &primary_restriction) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -672,6 +691,9 @@ void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryF
 }
 
 void ManageSystem::drop_primary_key(const std::string &table_name, const std::string &restriction_name) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -703,6 +725,9 @@ void ManageSystem::drop_primary_key(const std::string &table_name, const std::st
 }
 
 void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignField &foreign_restriction) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -714,6 +739,9 @@ void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignF
 }
 
 void ManageSystem::drop_foreign_key(const std::string &table_name, const std::string &restriction_name) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -741,6 +769,9 @@ void ManageSystem::drop_foreign_key(const std::string &table_name, const std::st
 }
 
 void ManageSystem::add_unique(const std::string &table_name, const std::vector<std::string> &column_list) {
+    if (!ensure_db_valid()) {
+        return;
+    }
     std::size_t table_loc = find_table_by_name(table_name, true);
     if (table_loc == table_mapping_map[current_db.id].count) {
         frontend->error("Table does not exist.");
@@ -1105,8 +1136,6 @@ Field ManageSystem::get_column_info(const std::string &table_name, const std::st
 }
 
 bool ManageSystem::is_table_exist(const std::string &table_name) {
-    assert(current_db.valid);
-
     auto &map = table_mapping_map[current_db.id];
     for (std::size_t i = 0; i < map.count; ++i) {
         if (table_name == map.mapping[i].name) {

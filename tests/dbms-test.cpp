@@ -33,6 +33,12 @@ public:
     void expect(const std::string &in, const std::string &expected) {
         oss.str("");
         exec(in);
+        if (oss.str() != expected) {
+            std::cerr << "<== EXPECTED ==>" << std::endl
+                      << expected << std::endl
+                      << "<== ACTUAL ==>" << std::endl
+                      << oss.str() << std::endl;
+        }
         assert(oss.str() == expected);
     }
 
@@ -43,7 +49,70 @@ public:
     }
 };
 
-void test() {
+void test_system_management() {
+    std::filesystem::remove_all(SYSTEM_ROOT);
+    TestSystem ts;
+
+    ts.exec(R"(CREATE DATABASE TEST_A;
+USE TEST_A;
+CREATE TABLE test_a1 (x INT, y INT NOT NULL);
+CREATE TABLE test_a2 (a INT, b INT);)");
+
+    ts.expect("CREATE TABLE test_a1 (m INT, n INT);", "[ERROR] Table of name test_a1 already exists.\n");
+
+    ts.expect("SHOW TABLES;", R"(+------------------+
+| Tables_in_TEST_A |
++------------------+
+| test_a1          |
+| test_a2          |
++------------------+
+2 rows in set
+)");
+
+    ts.expect("DESC test_a1;", R"(+-------+------+------+---------+
+| Field | Type | Null | Default |
++-------+------+------+---------+
+| x     | INT  | YES  | NULL    |
+| y     | INT  | NO   | NULL    |
++-------+------+------+---------+
+2 rows in set
+)");
+
+    ts.exec(R"(CREATE DATABASE TEST_B;
+USE TEST_B;
+CREATE TABLE test_b1 (p INT DEFAULT 42, q FLOAT NOT NULL, r VARCHAR(24));)");
+
+    ts.expect("DESC test_b1;", R"(+-------+-------------+------+---------+
+| Field | Type        | Null | Default |
++-------+-------------+------+---------+
+| p     | INT         | YES  | 42      |
+| q     | FLOAT       | NO   | NULL    |
+| r     | VARCHAR(24) | YES  | NULL    |
++-------+-------------+------+---------+
+3 rows in set
+)");
+
+    ts.expect("DESC test_b2;", "[ERROR] Table does not exist.\n");
+
+    ts.exec("DROP TABLE test_b1;");
+    ts.expect("SHOW TABLES;", "Empty set\n");
+
+    ts.exec("DROP DATABASE TEST_B;");
+    ts.expect("SHOW TABLES;", "[ERROR] DB is not opened yet.\n");
+
+    ts.exec("USE TEST_A; DROP TABLE test_a1;");
+    ts.expect("SHOW TABLES;", R"(+------------------+
+| Tables_in_TEST_A |
++------------------+
+| test_a2          |
++------------------+
+1 row in set
+)");
+
+    std::filesystem::remove_all(SYSTEM_ROOT);
+}
+
+void test_integrity() {
     std::filesystem::remove_all(SYSTEM_ROOT);
     TestSystem ts;
 
@@ -71,6 +140,7 @@ PRIMARY KEY (x);
 }
 
 int main() {
-    test();
+    test_system_management();
+    test_integrity();
     return 0;
 }
