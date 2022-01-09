@@ -17,4 +17,6 @@ public:
     int offset;
 
     SelectStmt();
+
+    void print_stmt();
 };

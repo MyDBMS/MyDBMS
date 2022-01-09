@@ -51,5 +51,9 @@ public:
     std::vector<Value> value_list;
     std::string str;  //  LIKE_STR 里的字符串
 
+    bool is_solved;
+
     WhereClause();
+
+    void print_wc();
 };

@@ -335,11 +335,11 @@ RecordSet QuerySystem::search_by_index(std::string table_name, std::string colum
 //  已有一个表的结果，用其驱动得到两表 join 后根据 where_clause 筛选的结果
 //  其中 where_clause 一定是 another_table.column1 = table_name.column2
 /// 并且保证 table_name 在 column2 上建有索引
-RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::string table_name, WhereClause where_clause){
+RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::string table_name, Column column1, Column column2){
     std::map<Value, RecordSet> rs_map;
     rs_map.clear();
     for(auto record : input_result.record){
-        auto record_val = get_column_value(input_result.columns, record, where_clause.column);
+        auto record_val = get_column_value(input_result.columns, record, column1);
         if (rs_map.find(record_val) == rs_map.end()){
             RecordSet rs;
             rs.columns = input_result.columns;
@@ -350,13 +350,12 @@ RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::stri
             rs_map[record_val].record.push_back(record);
     }
     RecordSet result;
-    result.columns = input_result.columns;
     for(auto ite : rs_map){
         auto rs = ite.second;
         int key = ite.first.asInt();
-        auto search_result = search_by_index(table_name, where_clause.expr.column.column_name, key, key);
+        auto search_result = search_by_index(table_name, column2.column_name, key, key);
         auto join_result = join_Recordset(rs, search_result);
-        result = add_RecordSet(result, join_result);
+        result = add_RecordSet(join_result, result);
     }
     return result;
 }
@@ -377,9 +376,10 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
                     result.record.push_back(data);
             }
             else if (where_clause.expr.type == Expr::Type::COLUMN){
-                auto cmp_val = get_column_value(input_result.columns, data, column);
-                if (compare_Value(col_val, cmp_val, where_clause.op_type))
+                auto cmp_val = get_column_value(input_result.columns, data, where_clause.expr.column);
+                if (compare_Value(col_val, cmp_val, where_clause.op_type)){
                     result.record.push_back(data);
+                }
             }
         }
         return result;
@@ -505,14 +505,28 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
             RecordSet record_set;
             return record_set;
         }
-    //  尝试用单表单列索引加速
+    //  for debug
+    /* {
+        RecordSet init_result;  //  初始没有列，有一条记录（为了 join )
+        RecordData rd;  //  空的
+        init_result.record.push_back(rd);
+        for(auto table_name : table_names)
+            init_result = join_Recordset(init_result, search_whole_table(table_name));
+        auto result = init_result;
+        //  施加其他选择子
+        for(auto where_clause : where_clauses){
+            result = search_where_clause(result, where_clause);
+        }
+        return result;
+    } */
+    //  为每个表名判断是否可以利用索引，可以的话直接将索引的wc和其他非join型wc消耗掉
     std::map<std::string, int> lb;  //  列名关键码范围的lower bound
     std::map<std::string, int> ub;  //  列名关键码范围的upper bound
     lb.clear();
     ub.clear();
     //  先求出每个列的查询范围
     for(auto where_clause : where_clauses){
-        if (where_clause.type == WhereClause::Type::OP_EXPR){  //  只有这种形式可以使用索引
+        if (where_clause.type == WhereClause::Type::OP_EXPR){  //  是 COL OP EXPR 型
             auto column = where_clause.column;
             auto expr = where_clause.expr;
             if (expr.type == Expr::Type::VALUE && expr.value.type == Value::Type::INT){  //  必须是 table.column op key，且 key 是整型
@@ -547,47 +561,120 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
             }
         }
     }
-    bool is_use_index = false;
-    Column index_column;
-    int l;
-    int r;
-    // 任找出一个范围合法的作按索引查询
-    // TODO: 多个合法，找一个表的列数最多的
+    std::map<std::string, bool> is_use_index;
+    is_use_index.clear();
+    std::map<std::string, int> l_val;
+    l_val.clear();
+    std::map<std::string, int> r_val;
+    r_val.clear();
+    std::map<std::string, Column> index_column;
+    index_column.clear();
+    // 对每个表任找出一个范围合法的作按索引查询
     for(auto where_clause : where_clauses){
         auto column = where_clause.column;
         if (lb.find(column.table_name + "_" + column.column_name) != lb.end()){
-            l = lb[column.table_name + "_" + column.column_name];
-            r = ub[column.table_name + "_" + column.column_name];
+            int l = lb[column.table_name + "_" + column.column_name];
+            int r = ub[column.table_name + "_" + column.column_name];
             if (l <= r){
-                is_use_index = true;
-                index_column = column;
+                /* continue;  //  for debug */
+                is_use_index[column.table_name] = true;
+                l_val[column.table_name] = l;
+                r_val[column.table_name] = r;
+                index_column[column.table_name] = column;
                 break;
             }
         }
     }
+    std::vector<RecordSet> result_vec;
+    result_vec.clear();
+    std::map<std::string, int> vec_index;
+    vec_index.clear();
+    for(auto table_name : table_names){
+        vec_index[table_name] = -1;
+        if (is_use_index.find(table_name) != is_use_index.end() && is_use_index[table_name]){
+            auto index_result = search_by_index(table_name, index_column[table_name].column_name, l_val[table_name], r_val[table_name]);
+            //  施加其他同为 table_name 的选择子
+            for(int i = 0; i < where_clauses.size(); i ++){
+                auto where_clause = where_clauses[i];
+                //  跳过施加了索引的
+                if (where_clause.type == WhereClause::Type::OP_EXPR){
+                    auto column = where_clause.column;
+                    auto expr = where_clause.expr;
+                    if (column == index_column[table_name] && expr.type == Expr::Type::VALUE){
+                        where_clauses[i].is_solved = true;
+                        continue;
+                    }
+                }
+                if (where_clause.column.table_name == table_name){
+                    //  如果是和别的表有关联，则跳过
+                    if (where_clause.type == WhereClause::Type::OP_EXPR 
+                        && where_clause.expr.type == Expr::Type::COLUMN
+                        && where_clause.expr.column.table_name != table_name) continue;
+                    //  否则，消耗掉
+                    index_result = search_where_clause(index_result, where_clause);
+                    where_clauses[i].is_solved = true;
+                }
+            }
+            vec_index[table_name] = result_vec.size();
+            result_vec.push_back(index_result);
+        }
+    }
+    //  TODO: 用驱动法 join 
+    /* for(auto table_name : table_names){
+        if (vec_index[table_name] == -1){
+            auto whole_result = search_whole_table(table_name);
+            vec_index[table_name] = result_vec.size();
+            result_vec.push_back(whole_result);
+        }
+    } */
+    //  每次找到可以被驱动的表，否则任找一个
+    while (true){
+        bool bz = false;
+        //  驱动笛卡尔积
+        for(int i = 0; i < where_clauses.size(); i ++){
+            auto where_clause = where_clauses[i];
+            if (where_clause.is_solved) continue;
+            if (where_clause.type == WhereClause::Type::OP_EXPR && where_clause.expr.type == Expr::Type::COLUMN){
+                auto column1 = where_clause.column;
+                auto column2 = where_clause.expr.column;
+                auto table1 = where_clause.column.table_name;
+                auto table2 = where_clause.expr.column.table_name;
+                if (table1 == table2) continue;
+                if (vec_index[table1] == -1 && vec_index[table2] == -1) continue;
+                if (vec_index[table1] != -1 && vec_index[table2] != -1) continue;
+                if (vec_index[table1] == -1) std::swap(column1, column2);
+                if (ms.is_index_exist(column2.table_name, column2.column_name)){
+                    bz = true;
+                    int loc = vec_index[column1.table_name];
+                    result_vec[loc] = search_by_another_table(result_vec[loc], column2.table_name, column1, column2);
+                    vec_index[column2.table_name] = loc;
+                    where_clauses[i].is_solved = true;
+                    break;
+                }
+            }
+        }
+        //  随便找一个
+        if (!bz){
+            for(auto table_name : table_names)
+                if (vec_index[table_name] == -1){
+                    bz = true;
+                    vec_index[table_name] = result_vec.size();
+                    result_vec.push_back(search_whole_table(table_name));
+                    break;
+                }
+            if (!bz) break;
+        }
+    }
+    //  将结果列表里的全部卷起来
     RecordSet init_result;  //  初始没有列，有一条记录（为了 join )
     RecordData rd;  //  空的
     init_result.record.push_back(rd);
-    if (is_use_index){
-        auto by_index_result = search_by_index(index_column.table_name, index_column.column_name, l, r);
-        init_result = by_index_result;
-    }
-    //  考虑多表 join ，把其他表的全表与其合并
-    for(auto table_name : table_names){
-        if (!is_use_index || table_name != index_column.table_name){
-            auto table_result = search_whole_table(table_name);
-            init_result = join_Recordset(init_result, table_result);
-        }
-    }
+    for(auto rt : result_vec)
+        init_result = join_Recordset(init_result, rt);
     auto result = init_result;
     //  施加其他选择子
     for(auto where_clause : where_clauses){
-        //  检查是否可以跳过这个选择子，只有当这个选择子效果和索引一致时
-        if (is_use_index && where_clause.type == WhereClause::Type::OP_EXPR){
-            auto column = where_clause.column;
-            auto expr = where_clause.expr;
-            if (column == index_column && expr.type == Expr::Type::VALUE) continue;
-        }
+        if (where_clause.is_solved) continue;
         result = search_where_clause(result, where_clause);
     }
     return result;
@@ -672,7 +759,6 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         result.columns.push_back(column);
         
         //  处理聚合计算
-        std::cout << "group by " << group_by.column.table_name + "." + group_by.column.column_name << std::endl;
         {
             int cnt_not_null = 0;
             std::map<Value, Value> calc_map;
@@ -848,6 +934,8 @@ RecordSet QuerySystem::search_limit_offset(RecordSet input_result, int limit, in
 }
 
 RecordSet QuerySystem::search(SelectStmt select_stmt){
+    /* printf("search!\n");
+    select_stmt.print_stmt(); */
     if (!ms.ensure_db_valid()){
         flag = false;
         return RecordSet();
