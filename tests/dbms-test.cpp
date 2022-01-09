@@ -197,6 +197,7 @@ ALTER TABLE test_unique ADD UNIQUE (x, y);)");
 +-------+------+------+---------+
 2 rows in set
 PRIMARY KEY (x);
+INDEX (x);
 )");
 
     ts.expect("INSERT INTO test_primary VALUES (NULL, 0);", "[ERROR] Field cannot be null!\n");
@@ -230,6 +231,8 @@ PRIMARY KEY (x);
 +-------+------+------+---------+
 2 rows in set
 PRIMARY KEY yx(x, y);
+INDEX (x);
+INDEX (y);
 )");
 
     ts.expect("INSERT INTO test_primary VALUES (3, 3);", "");

@@ -85,6 +85,8 @@ class ManageSystem {
 
     std::string find_column_by_id(std::size_t table_loc, std::size_t column_id);
 
+    void add_index(std::size_t table_loc, std::size_t column_id);
+
     bool add_primary_key(std::size_t table_loc, const PrimaryField &f);
 
     bool add_foreign_key(std::size_t table_loc, const ForeignField &f);

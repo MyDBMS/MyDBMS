@@ -103,6 +103,14 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
     return info.fields[column_id].column_name;
 }
 
+void ManageSystem::add_index(std::size_t table_loc, std::size_t column_id) {
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+    auto index_file_path = current_db.dir;
+    index_file_path.append("idx_" + std::to_string(info.id) + "_" + info.fields[column_id].column_name + ".txt");
+    is.create_file(index_file_path.c_str());
+    info.fields[column_id].indexed = true;
+}
+
 bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
     if (table_info.primary_field_count == MAX_PRIMARY_FIELD_COUNT) {
@@ -126,6 +134,16 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f)
         }
         table_info.fields[column_id].nullable = false;
         table_info_field.column_bitmap |= (1u << column_id);
+    }
+    for (const auto &column_name: f.columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("Internal warning regarding adding primary key.");
+            continue;
+        }
+        if (!table_info.fields[column_id].indexed) {
+            add_index(table_loc, column_id);
+        }
     }
     return true;
 }
@@ -651,9 +669,6 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
         return;
     }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
-    auto record_file = get_record_file(table_name);
-    std::size_t length_limit = get_record_length_limit(table_name);
-    auto buffer = new char[length_limit + 5];
 
     if (column_list.size() != 1) {
         frontend->error("Only single-column indexing is supported.");
@@ -671,10 +686,10 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
         return;
     }
 
-    auto index_file_path = current_db.dir;
-    index_file_path.append("idx_" + std::to_string(info.id) + "_" + column_list[0] + ".txt");
-    is.create_file(index_file_path.c_str());
-    field.indexed = true;
+    add_index(table_loc, column_id);
+    std::size_t length_limit = get_record_length_limit(table_name);
+    auto buffer = new char[length_limit + 5];
+    auto record_file = get_record_file(table_name);
 
     auto index_file = get_index_file(table_name, column_list[0]);
     for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
