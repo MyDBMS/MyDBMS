@@ -203,6 +203,14 @@ void QuerySystem::insert_record(std::string table_name, std::vector<Value> value
     if (!ms.ensure_db_valid()){
         return;
     }
+    //  如果一个域字段定义为 FLOAT ，要把解析出的整数转换过去
+    for(int i = 0; i < values.size(); i ++){
+        auto column_name = ms.get_column_name(table_name, i);
+        if (values[i].type == Value::INT && ms.get_column_info(table_name, column_name).type == Field::Type::FLOAT){
+            auto value = Value::make_value(float(values[i].asInt()));
+            values[i] = value;
+        }
+    }
     switch (ms.validate_insert_data(table_name, values)) {
         case Error::NONE:
             break;
@@ -871,6 +879,14 @@ void QuerySystem::update_record(std::string table_name, std::vector<std::string>
     if (!ms.ensure_db_valid()){
         flag = false;
         return;
+    }
+    //  如果一个域字段定义为 FLOAT ，要把解析出的整数转换过去
+    for(int i = 0; i < update_values.size(); i ++){
+        auto column_name = column_names[i];
+        if (update_values[i].type == Value::INT && ms.get_column_info(table_name, column_name).type == Field::Type::FLOAT){
+            auto value = Value::make_value(float(update_values[i].asInt()));
+            update_values[i] = value;
+        }
     }
     //  构造查找语句，查询所有满足更改条件的记录
     SelectStmt select_stmt;
