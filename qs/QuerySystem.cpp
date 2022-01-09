@@ -190,6 +190,9 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
 
 void QuerySystem::insert_record(std::string table_name, std::vector<Value> values){
     flag = false;
+    if (!ms.ensure_db_valid()){
+        return;
+    }
     switch (ms.validate_insert_data(table_name, values)) {
         case Error::NONE:
             flag = true;
@@ -714,6 +717,10 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
 }
 
 RecordSet QuerySystem::search(SelectStmt select_stmt){
+    if (!flag || !ms.ensure_db_valid()){
+        flag = false;
+        return RecordSet();
+    }
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
     auto result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
     /* printf("search finished!\n");
@@ -722,13 +729,12 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
 }
 
 void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause> where_clauses){
-    //  构造查找语句，查询所有满足删除条件的记录
-    SelectStmt select_stmt;
-    if (!ms.is_table_exist(table_name)){
-        ms.frontend->error("Table does not exist!");
+    if (!ms.ensure_db_valid()){
         flag = false;
         return;
     }
+    //  构造查找语句，查询所有满足删除条件的记录
+    SelectStmt select_stmt;
     select_stmt.table_names.push_back(table_name);
     select_stmt.where_clauses = where_clauses;
     auto result = search(select_stmt);
@@ -741,7 +747,7 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
             case Error::DELETE_NONE:
                 break;
             case Error::DELETE_TABLE_DOES_NOT_EXIST:
-                ms.frontend->error("Table name not found.");
+                ms.frontend->error("Table does not exist!");
                 continue;
             case Error::DELETE_FOREIGN_RESTRICTION_FAIL:
                 ms.frontend->error("Foreign constraint failed.");
@@ -768,6 +774,10 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
 }
 
 void QuerySystem::update_record(std::string table_name, std::vector<std::string> column_names, std::vector<Value> update_values, std::vector<WhereClause> where_clauses){
+    if (!ms.ensure_db_valid()){
+        flag = false;
+        return;
+    }
     //  构造查找语句，查询所有满足更改条件的记录
     SelectStmt select_stmt;
     select_stmt.table_names.push_back(table_name);
@@ -792,6 +802,10 @@ void QuerySystem::update_record(std::string table_name, std::vector<std::string>
 }
 
 void QuerySystem::search_entry(SelectStmt select_stmt){
+    if (!ms.ensure_db_valid()){
+        flag = false;
+        return;
+    }
     flag = true;
     auto result = search(select_stmt);
     if (flag) ms.frontend->print_table(from_RecordSet_to_Table(result));
