@@ -21,6 +21,9 @@ std::string QuerySystem::from_Value_to_string(Value value){
 }
 
 RecordSet QuerySystem::join_Recordset(RecordSet a, RecordSet b){
+    /* printf("join A and B\n");
+    ms.frontend->print_table(from_RecordSet_to_Table(a));
+    ms.frontend->print_table(from_RecordSet_to_Table(b)); */
     RecordSet c;
     for(auto col : a.columns)
         c.columns.push_back(col);
@@ -63,16 +66,19 @@ RecordSet QuerySystem::merge_Recordset(RecordSet a, RecordSet b){
 }
 
 bool QuerySystem::compare_Value(Value a, Value b, WhereClause::OP_Type op_type){
-    if (a.type == Value::Type::NUL && b.type == Value::Type::NUL)
-        return op_type == WhereClause::OP_Type::EQ;  //  两 null 比较，只有相等是 true
-    if (a.type == Value::Type::NUL || b.type == Value::Type::NUL){
-        ms.frontend->error("Null value cannot participate in comparison");
-        flag = false;
+    if (a.type == Value::Type::NUL && b.type == Value::Type::NUL){ //  两 null 比较
+        /* return op_type == WhereClause::OP_Type::EQ;  */ 
+        return false;
+    }
+    if (a.type == Value::Type::NUL || b.type == Value::Type::NUL){  //  null 和正常类型比较
+        /* ms.frontend->error("Null value cannot participate in comparison");
+        flag = false; */
         return false;
     }
     //  两者皆非 null
     if (a.type != b.type){  //  类型不一致
-        ms.frontend->error("The two compared value types do not match");
+        if (flag)
+            ms.frontend->error("The two compared value types do not match");
         flag = false;
         return false;
     }
@@ -119,7 +125,8 @@ Value QuerySystem::get_column_value(std::vector<Column> columns, RecordData reco
         cnt ++;
     }
     if (!is_exist){
-        ms.frontend->error("column value is not exist");
+        if (flag)
+            ms.frontend->error("column value is not exist");
         flag = false;
         return Value::make_value();
     }
@@ -137,7 +144,8 @@ void QuerySystem::set_column_value(std::vector<Column> columns, RecordData &reco
         cnt ++;
     }
     if (!is_exist){
-        ms.frontend->error("column value is not exist");
+        if (flag)
+            ms.frontend->error("column value is not exist");
         flag = false;
         return;
     }
@@ -163,7 +171,8 @@ void QuerySystem::set_column_value(std::vector<Column> columns, RecordData &reco
                 break;
         }
         if (!is_valid){
-            ms.frontend->error("update value's type is not expected");
+            if (flag)
+                ms.frontend->error("update value's type is not expected");
             flag = false;
             return;
         }
@@ -189,41 +198,41 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
 }
 
 void QuerySystem::insert_record(std::string table_name, std::vector<Value> values){
-    flag = false;
     if (!ms.ensure_db_valid()){
         return;
     }
-    switch (ms.validate_insert_data(table_name, values)) {
-        case Error::NONE:
-            flag = true;
-            break;
-        case Error::VALUE_COUNT_MISMATCH:
-            ms.frontend->error("Field count mismatch!");
-            return;
-        case Error::TYPE_MISMATCH:
-            ms.frontend->error("Field type mismatch!");
-            return;
-        case Error::STR_TOO_LONG:
-            ms.frontend->error("String value is too long!");
-            return;
-        case Error::FIELD_CANNOT_BE_NULL:
-            ms.frontend->error("Field cannot be null!");
-            return;
-        case Error::UNIQUE_RESTRICTION_FAIL:
-            ms.frontend->error("Unique constraint failed!");
-            return;
-        case Error::PRIMARY_RESTRICTION_FAIL:
-            ms.frontend->error("Primary constraint failed!");
-            return;
-        case Error::INSERT_FOREIGN_RESTRICTION_FAIL:
-            ms.frontend->error("Foreign constraint failed!");
-            return;
-        case Error::TABLE_DOES_NOT_EXIST:
-            ms.frontend->error("Table does not exist!");
-            return;
-        default:
-            ms.frontend->error("Internal warning: insertion failed due to unhandled reason.");
-            return;
+    if (flag){
+        switch (ms.validate_insert_data(table_name, values)) {
+            case Error::NONE:
+                break;
+            case Error::VALUE_COUNT_MISMATCH:
+                ms.frontend->error("Field count mismatch!");
+                return;
+            case Error::TYPE_MISMATCH:
+                ms.frontend->error("Field type mismatch!");
+                return;
+            case Error::STR_TOO_LONG:
+                ms.frontend->error("String value is too long!");
+                return;
+            case Error::FIELD_CANNOT_BE_NULL:
+                ms.frontend->error("Field cannot be null!");
+                return;
+            case Error::UNIQUE_RESTRICTION_FAIL:
+                ms.frontend->error("Unique constraint failed!");
+                return;
+            case Error::PRIMARY_RESTRICTION_FAIL:
+                ms.frontend->error("Primary constraint failed!");
+                return;
+            case Error::INSERT_FOREIGN_RESTRICTION_FAIL:
+                ms.frontend->error("Foreign constraint failed!");
+                return;
+            case Error::TABLE_DOES_NOT_EXIST:
+                ms.frontend->error("Table does not exist!");
+                return;
+            default:
+                ms.frontend->error("Internal warning: insertion failed due to unhandled reason.");
+                return;
+        }
     }
     std::size_t length;
     auto buffer = ms.from_record_to_bytes(table_name, values, length);
@@ -341,7 +350,8 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
         result.columns = input_result.columns;
         result.record.clear();
         if (where_clause.select_result.columns.size() != 1 || where_clause.select_result.record.size() != 1){
-            ms.frontend->error("select where column = select_table, select_table's size isn't 1");
+            if (flag)
+                ms.frontend->error("select where column = select_table, select_table's size isn't 1");
             flag = false;
             return input_result;
         }
@@ -356,23 +366,71 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
         return result;
     }
     else if (where_clause.type == WhereClause::Type::IS_NULL_OR_NOT_NULL){  //  COL IS (NOT) NULL
-        ms.frontend->warning("[QuerySystem] search where (COL IS (NOT) NULL) hasn't been finished yet");
-        return input_result;
+        auto column = where_clause.column;
+        bool clause_is_null = where_clause.null_or_not_null;
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            bool col_is_null = false;
+            //  在这条产生式里，跳过 Null 值
+            if (col_val.type == Value::NUL) col_is_null = true;
+            if (col_is_null == clause_is_null){
+                result.record.push_back(data);
+            }
+        }
+        return result;
     }
     else if (where_clause.type == WhereClause::Type::IN_VALUE_LIST){  //  COL IN VALUE_LIST
-        ms.frontend->warning("[QuerySystem] search where (COL IN VALUE_LIST) hasn't been finished yet");
-        return input_result;
+        /* ms.frontend->warning("[QuerySystem] search where (COL IN VALUE_LIST) hasn't been finished yet"); */
+        std::map<Value, bool> val_map;
+        val_map.clear();
+        for(auto val : where_clause.value_list)
+            val_map[val] = true;
+        auto column = where_clause.column;
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            if (col_val.type == Value::Type::NUL) continue;  //  忽略 NULL 值，必须使用 COL IS NULL
+            if (val_map.find(col_val) != val_map.end()) result.record.push_back(data);
+        }
+        return result;
     }
     else if (where_clause.type == WhereClause::Type::IN_SELECT){  //  COL IN SELECT
-        ms.frontend->warning("[QuerySystem] search where (COL IN SELECT) hasn't been finished yet");
-        return input_result;
+        /* ms.frontend->warning("[QuerySystem] search where (COL IN SELECT) hasn't been finished yet"); */
+        std::map<Value, bool> val_map;
+        val_map.clear();
+        if (where_clause.select_result.columns.size() != 1){  //  不是 value_list
+            if (flag)
+                ms.frontend->error("select where column in select_table, select_table's isn't a list");
+            flag = false;
+            return input_result;
+        }
+        for(auto input_record : where_clause.select_result.record){
+            auto val = input_record.values[0];
+            val_map[val] = true;
+        }
+        auto column = where_clause.column;
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            if (col_val.type == Value::Type::NUL) continue;  //  忽略 NULL 值，必须使用 COL IS NULL
+            if (val_map.find(col_val) != val_map.end()) result.record.push_back(data);
+        }
+        return result;
     }
     else if (where_clause.type == WhereClause::Type::LIKE_STR){  //  COL LIKE STR
         ms.frontend->warning("[QuerySystem] search where (COL LIKE STR) hasn't been finished yet");
         return input_result;
     }
     else{
-        ms.frontend->error("[QuerySystem] search where doesn't match any rule");
+        if (flag)
+            ms.frontend->error("[QuerySystem] search where doesn't match any rule");
         flag = false;
         return input_result;
     }
@@ -382,7 +440,8 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
     //  判断每个表是否都存在
     for(auto table_name : table_names)
         if (!ms.is_table_exist(table_name)){
-            ms.frontend->error("table name does not exist");
+            if (flag)
+                ms.frontend->error("table name does not exist");
             flag = false;
             RecordSet record_set;
             return record_set;
@@ -490,7 +549,8 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
             cnt ++;
         }
         if (!is_exist){
-            ms.frontend->error("table.column name does not exist");
+            if (flag)
+                ms.frontend->error("table.column name does not exist");
             flag = false;
             return input_result;
         }
@@ -499,7 +559,8 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         //  处理有 GROUP BY 的情况
         if (!group_by.is_empty){
             if (selector.col != group_by.column){
-                ms.frontend->error("select column name and group by column name are different");
+                if (flag)
+                    ms.frontend->error("select column name and group by column name are different");
                 flag = false;
                 return input_result;
             }
@@ -531,7 +592,8 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         //  不允许对字符类型作非Count聚合
         bool is_str_type = ms.get_column_info(selector.col.table_name, selector.col.column_name).type == Field::Type::STR;
         if (is_str_type && selector.agr_type != Selector::Aggregator_Type::COUNT){
-            ms.frontend->error("String type can only aggregate by Count()");
+            if (flag)
+                ms.frontend->error("String type can only aggregate by Count()");
             flag = false;
             return input_result;
         }
@@ -685,7 +747,8 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         return result;
     }
     else{
-        ms.frontend->error("[QuerySystem] search selector doesn't match any rule");
+        if (flag)
+            ms.frontend->error("[QuerySystem] search selector doesn't match any rule");
         flag = false;
         return input_result;
     }
@@ -699,7 +762,8 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
     for(auto selector : selectors){
         if (selector.type == Selector::Type::CT){  //  这种情况只应该有一个投影子，返回一列一个数据表示数据量
             if (selectors.size() > 1){
-                ms.frontend->error("Count(*) must be the only selector");
+                if (flag)
+                    ms.frontend->error("Count(*) must be the only selector");
                 flag = false;
                 return input_result;
             }
@@ -743,18 +807,20 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
     for(auto record : result.record){
         RID rid = record.rid;
         auto values = record.values;
-        switch (ms.validate_delete_data(table_name, values)) {
-            case Error::DELETE_NONE:
-                break;
-            case Error::DELETE_TABLE_DOES_NOT_EXIST:
-                ms.frontend->error("Table does not exist!");
-                continue;
-            case Error::DELETE_FOREIGN_RESTRICTION_FAIL:
-                ms.frontend->error("Foreign constraint failed.");
-                continue;
-            default:
-                ms.frontend->warning("Internal warning: unhandled invalid deletion.");
-                continue;
+        if (flag){
+            switch (ms.validate_delete_data(table_name, values)) {
+                case Error::DELETE_NONE:
+                    break;
+                case Error::DELETE_TABLE_DOES_NOT_EXIST:
+                    ms.frontend->error("Table does not exist!");
+                    continue;
+                case Error::DELETE_FOREIGN_RESTRICTION_FAIL:
+                    ms.frontend->error("Foreign constraint failed.");
+                    continue;
+                default:
+                    ms.frontend->warning("Internal warning: unhandled invalid deletion.");
+                    continue;
+            }
         }
         record_file->delete_record(rid);
         //  枚举所有的索引
