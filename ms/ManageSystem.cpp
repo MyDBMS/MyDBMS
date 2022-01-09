@@ -118,7 +118,8 @@ void ManageSystem::add_index(std::size_t table_loc, std::size_t column_id, bool 
     auto index_file = get_index_file(info.name, info.fields[column_id].column_name);
     for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
         std::size_t length = record_file->get_record(rid, buffer);
-        index_file->insert_record(from_bytes_to_record(info.name, buffer, length)[column_id].asInt(), rid);
+        auto v = from_bytes_to_record(info.name, buffer, length)[column_id];
+        if (!v.isNull()) index_file->insert_record(v.asInt(), rid);
     }
     delete[] buffer;
 }
@@ -160,7 +161,7 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f,
     return true;
 }
 
-bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f) {
+bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f, bool need_add_data_to_index) {
     auto &table_mapping = table_mapping_map[current_db.id];
     auto &table_info = table_mapping.mapping[table_loc];
     if (table_info.foreign_field_count == MAX_FOREIGN_FIELD_COUNT) {
@@ -212,6 +213,16 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
         table_info_field.foreign_column_bitmap |= (1u << foreign_column_id);
         table_info_field.foreign_column_ids[column_id] = foreign_column_id;
     }
+    for (const auto &column_name: f.columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("Internal warning regarding adding foreign key.");
+            continue;
+        }
+        if (!table_info.fields[column_id].indexed) {
+            add_index(table_loc, column_id, need_add_data_to_index);
+        }
+    }
     return true;
 }
 
@@ -231,6 +242,16 @@ bool ManageSystem::add_unique(std::size_t table_loc, const std::vector<std::stri
             return false;
         }
         table_info_field.column_bitmap |= (1u << column_id);
+    }
+    for (const auto &column_name: columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("Internal warning regarding adding unique constraint.");
+            continue;
+        }
+        if (!table_info.fields[column_id].indexed) {
+            add_index(table_loc, column_id, true);
+        }
     }
     return true;
 }
@@ -509,7 +530,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
     table_info.foreign_field_count = 0;
     for (const auto &f: foreign_field_list) {
-        if (!add_foreign_key(table_mapping.count, f)) {
+        if (!add_foreign_key(table_mapping.count, f, false)) {
             return;
         }
     }
@@ -898,7 +919,7 @@ void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignF
         }
     }
 
-    if (add_foreign_key(table_loc, foreign_restriction)) {
+    if (add_foreign_key(table_loc, foreign_restriction, true)) {
         update_table_mapping_file(current_db.id);
         frontend->ok(0);
     }

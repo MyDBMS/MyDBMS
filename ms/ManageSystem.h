@@ -89,7 +89,7 @@ class ManageSystem {
 
     bool add_primary_key(std::size_t table_loc, const PrimaryField &f, bool need_add_data_to_index);
 
-    bool add_foreign_key(std::size_t table_loc, const ForeignField &f);
+    bool add_foreign_key(std::size_t table_loc, const ForeignField &f, bool need_add_data_to_index);
 
     bool add_unique(std::size_t table_loc, const std::vector<std::string> &columns);
 
