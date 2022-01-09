@@ -1,7 +1,7 @@
 #include "../ms/ManageSystem.h"
 #include "QuerySystem.h"
 
-#define SYSTEM_ROOT ("bin/root")
+#define SYSTEM_ROOT ("bin/ms-test-root")
 #define DB_NAME ("test_db")
 #define TABLE_NAME ("test_table")
 #define FOREIGN_TABLE_NAME ("foreign_tb")
@@ -67,6 +67,7 @@ void test_value() {
 }
 
 void test_ms() {
+    std::filesystem::remove_all(SYSTEM_ROOT);
     std::stringstream iss, oss;
     ManageSystem ms = ManageSystem::load_system(SYSTEM_ROOT, new StringStreamFrontend(iss, oss));
     QuerySystem qs{ms};

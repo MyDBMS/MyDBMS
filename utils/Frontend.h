@@ -8,6 +8,8 @@
 class Frontend {
     friend class Application;
 
+    friend class TestSystem;
+
     virtual void write_string(const std::string &s) const = 0;
 
     virtual char read_char() = 0;
