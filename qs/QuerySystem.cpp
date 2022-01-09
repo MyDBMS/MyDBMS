@@ -266,6 +266,7 @@ void QuerySystem::insert_record(std::string table_name, std::vector<Value> value
             index_file->insert_record(key, rid);
         }
     }
+    delete [] buffer;
 }
 
 RecordSet QuerySystem::search_whole_table(std::string table_name){
