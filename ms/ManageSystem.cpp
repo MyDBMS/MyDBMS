@@ -116,6 +116,7 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f)
             frontend->warning("In primary restriction, column name of " + column_name + " cannot be found.");
             return false;
         }
+        table_info.fields[column_id].nullable = false;
         table_info_field.column_bitmap |= (1u << column_id);
     }
     return true;
