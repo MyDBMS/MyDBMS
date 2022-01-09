@@ -497,6 +497,14 @@ bool IndexFile::delete_range_key(std::size_t page_id, int lower_bound, int upper
     auto max_key = get_key(page, get_pre_key_id(page, 0));
     if (min_key > upper_bound || max_key < lower_bound) return false;
     if (min_key >= lower_bound && max_key <= upper_bound){  //  整个叶子都删掉
+        //  如果这就是根，直接删了关键码就行
+        if (page_id == meta.root_page){
+            header->key_num = 0;
+            header->first_key_id = 0;
+            set_pre_key_id(page, 0, 0);
+            set_suc_key_id(page, 0, 0);
+            return true;
+        }
         auto now_page_id = page_id;
         u_int8_t key_id;
         while (true){
@@ -546,6 +554,11 @@ bool IndexFile::delete_key_leaf(std::size_t page_id, std::size_t key_id){
     auto page = file->get_page(page_id);
     auto header = (IndexPageHeader *) page->data;
     if (header->key_num == 1){  //  整个叶子都删掉
+        //  如果这就是根，直接删了关键码就行
+        if (page_id == meta.root_page){
+            delete_key(page_id, key_id);
+            return true;
+        }
         auto now_page_id = page_id;
         u_int8_t key_id;
         while (true){
