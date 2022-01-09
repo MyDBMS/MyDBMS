@@ -1,5 +1,7 @@
 #include "QuerySystem.h"
 
+#include <regex>
+
 QuerySystem::QuerySystem(ManageSystem &ms): ms(ms) {
 }
 
@@ -28,9 +30,6 @@ std::string QuerySystem::from_Value_to_string(Value value){
 }
 
 RecordSet QuerySystem::join_Recordset(RecordSet a, RecordSet b){
-    /* printf("join A and B\n");
-    ms.frontend->print_table(from_RecordSet_to_Table(a));
-    ms.frontend->print_table(from_RecordSet_to_Table(b)); */
     RecordSet c;
     for(auto col : a.columns)
         c.columns.push_back(col);
@@ -51,6 +50,11 @@ RecordSet QuerySystem::join_Recordset(RecordSet a, RecordSet b){
 }
 
 RecordSet QuerySystem::merge_Recordset(RecordSet a, RecordSet b){
+    //  处理无法合并的情况
+    if (a.record.size() != b.record.size()){
+        QS_error("Internal warning: the arguements of merge_Recordset don't contain the same number of rows");
+        return a;
+    }
     RecordSet c;
     for(auto col : a.columns)
         c.columns.push_back(col);
@@ -243,8 +247,6 @@ void QuerySystem::insert_record(std::string table_name, std::vector<Value> value
         auto value = values[column_id];
         if (value.type != Value::NUL){
             int key = value.asInt();
-            /* std::cout << "[QuerySystem] insert record " << table_name << " " << column_name << " " << key << std::endl;
-            printf("RID is { %d , %d }\n", rid.page_id, rid.slot_id); */
             auto index_file = ms.get_index_file(table_name, column_name);
             index_file->insert_record(key, rid);
         }
@@ -268,7 +270,6 @@ RecordSet QuerySystem::search_whole_table(std::string table_name){
     RID rid = record_file->find_first();
     //  遍历
     while (true){
-        /* printf("RID is { %d , %d }\n", rid.page_id, rid.slot_id); */
         if (rid.page_id == 0) break;  //  遍历完成
         char* buffer = new char[max_length];
         std::size_t length = record_file->get_record(rid, buffer);
@@ -412,13 +413,39 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
         for(auto data : input_result.record){
             auto col_val = get_column_value(input_result.columns, data, column);
             if (col_val.type == Value::Type::NUL) continue;  //  忽略 NULL 值，必须使用 COL IS NULL
-            if (val_map.find(col_val) != val_map.end()) result.record.push_back(data);
+            if (val_map.find(col_val) != val_map.end()) 
+                result.record.push_back(data);
         }
         return result;
     }
     else if (where_clause.type == WhereClause::Type::LIKE_STR){  //  COL LIKE STR
-        ms.frontend->warning("[QuerySystem] search where (COL LIKE STR) hasn't been finished yet");
-        return input_result;
+        /* ms.frontend->warning("[QuerySystem] search where (COL LIKE STR) hasn't been finished yet"); */
+        auto column = where_clause.column;
+        //  判断这一列是不是字符串类型
+        if (ms.get_column_info(column.table_name, column.column_name).type != Field::Type::STR){
+            QS_error("select COL LIKE STR, field type must be string");
+            return input_result;
+        }
+        std::string str = where_clause.str;
+        str = str.substr(1, str.length() - 2);
+        std::string regex_str = "";
+        for(auto ch : str){
+            if (ch == '%')
+                regex_str += ".*";
+            else if (ch == '_')
+                regex_str += ".";
+            else regex_str += ch;
+        }
+        RecordSet result;
+        result.columns = input_result.columns;
+        result.record.clear();
+        for(auto data : input_result.record){
+            auto col_val = get_column_value(input_result.columns, data, column);
+            if (col_val.type == Value::Type::NUL) continue;  //  忽略 NULL 值，必须使用 COL IS NULL
+            if (std::regex_match(col_val.asString(), std::regex(regex_str))) 
+                result.record.push_back(data);
+        }
+        return result;
     }
     else{
         QS_error("[QuerySystem] search where doesn't match any rule");
@@ -523,7 +550,6 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
 }
 
 RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector, GroupBy group_by){
-    /* printf("search selector\n"); */
     if (selector.type == Selector::Type::COL){
         auto column = selector.col;
         /* std::cout << "column type, " << column.table_name << " " << column.column_name << std::endl; */
@@ -602,18 +628,22 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         result.columns.push_back(column);
         
         //  处理聚合计算
+        std::cout << "group by " << group_by.column.table_name + "." + group_by.column.column_name << std::endl;
         {
             int cnt_not_null = 0;
             std::map<Value, Value> calc_map;
             std::map<Value, int> count_map;
+            std::map<Value, bool> exist_map;
             calc_map.clear();
             count_map.clear();
+            exist_map.clear();
             for(auto record : input_result.record){
                 RecordData rd;
                 Value group_by_val;
                 //  没有 group by 的话，全部聚合到一起
                 if (group_by.is_empty) group_by_val = Value::make_value();
                 else group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                exist_map[group_by_val] = true;
                 Value record_val = get_column_value(input_result.columns, record, selector.col);
                 if (record_val.type == Value::Type::NUL) continue;  //  不对 Null 作聚合
                 else cnt_not_null ++;
@@ -682,11 +712,10 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
                 }
             } */
             //  否则，按 group_by_val 的偏序插入 RecordSet
-            for(auto ite : calc_map){
-                Value result_val = ite.second;
+            for(auto ite : exist_map){
                 RecordData rd;
                 //  处理全 null
-                if (count_map[ite.first] == 0){
+                if (count_map.find(ite.first) == count_map.end() || count_map[ite.first] == 0){
                     switch (selector.agr_type){
                         case Selector::Aggregator_Type::COUNT :
                             rd.values.push_back(Value::make_value(0));
@@ -705,6 +734,7 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
                     }
                     continue;
                 }
+                Value result_val = calc_map[ite.first];
                 if (selector.agr_type == Selector::Aggregator_Type::AVERAGE){
                     if (result_val.type == Value::Type::INT)
                         result_val = Value::make_value((float)result_val.asInt() / count_map[ite.first]);
@@ -736,7 +766,6 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
 
 RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Selector> selectors, GroupBy group_by){
     if (selectors.size() == 0) return input_result;  //  * 的情况
-    /* printf("search selectors\n"); */
     RecordSet result;  //  空的
     bool is_empty = true;
     for(auto selector : selectors){
@@ -748,7 +777,6 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
             return search_selector(input_result, selector, group_by);  //  唯一，直接返回
         }
         auto output_result = search_selector(input_result, selector, group_by);
-        /* ms.frontend->print_table(from_RecordSet_to_Table(output_result)); */
         if (is_empty){
             result = output_result;
             is_empty = false;
@@ -793,8 +821,6 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
     auto selector_result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
     auto result = search_limit_offset(selector_result, select_stmt.limit, select_stmt.offset);
-    /* printf("search finished!\n");
-    ms.frontend->print_table(from_RecordSet_to_Table(result)); */
     return result;
 }
 
@@ -834,8 +860,6 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
             auto value = values[column_id];
             if (value.type != Value::NUL){
                 int key = value.asInt();
-                /* std::cout << "[QuerySystem] insert record " << table_name << " " << column_name << " " << key << std::endl;
-                printf("RID is { %d , %d }\n", rid.page_id, rid.slot_id); */
                 auto index_file = ms.get_index_file(table_name, column_name);
                 index_file->delete_record(key, rid);
             }
