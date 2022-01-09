@@ -758,6 +758,23 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
     return result;
 }
 
+RecordSet QuerySystem::search_limit_offset(RecordSet input_result, int limit, int offset){
+    if (offset == 0 && limit >= input_result.record.size()) return input_result;
+    RecordSet result;
+    result.columns = input_result.columns;
+    result.record.clear();
+    int index = 0;
+    int cnt = 0;
+    for(auto record : input_result.record){
+        if (index >= offset){
+            cnt ++;
+            if (cnt <= limit) result.record.push_back(record);
+        }
+        index ++;
+    }
+    return result;
+}
+
 RecordSet QuerySystem::search(SelectStmt select_stmt){
     if (!ms.ensure_db_valid()){
         flag = false;
@@ -774,7 +791,8 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
         ha_map[table_name] = true;
     }
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
-    auto result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
+    auto selector_result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
+    auto result = search_limit_offset(selector_result, select_stmt.limit, select_stmt.offset);
     /* printf("search finished!\n");
     ms.frontend->print_table(from_RecordSet_to_Table(result)); */
     return result;

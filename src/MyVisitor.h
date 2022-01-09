@@ -319,7 +319,6 @@ public:
         return res;
     }
 
-    //  TODO: 变成真正的版本
     virtual antlrcpp::Any visitSelect_table(SQLParser::Select_tableContext *ctx) override {
         auto res = visitChildren(ctx);
         ctx->select_stmt.table_names = ctx->identifiers()->idents;
@@ -329,6 +328,12 @@ public:
         if (ctx->column()){
             ctx->select_stmt.group_by.is_empty = false;
             ctx->select_stmt.group_by.column = ctx->column()->column;
+        }
+        auto int_list = ctx->Integer();
+        if (int_list.size() > 0){
+            ctx->select_stmt.limit = std::stoi(int_list[0]->getText());
+            if (int_list.size() == 2)
+                ctx->select_stmt.offset = std::stoi(int_list[1]->getText());
         }
         return res;
     }

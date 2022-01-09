@@ -41,6 +41,8 @@ private:
     RecordSet search_selector(RecordSet input_result, Selector selector, GroupBy group_by);
 
     RecordSet search_selectors(RecordSet input_result, std::vector<Selector> selectors, GroupBy group_by);
+
+    RecordSet search_limit_offset(RecordSet input_result, int limit, int offset);
 public:
     ManageSystem &ms;
 
