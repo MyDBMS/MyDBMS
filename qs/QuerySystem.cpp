@@ -76,6 +76,13 @@ RecordSet QuerySystem::merge_Recordset(RecordSet a, RecordSet b){
     return c;
 }
 
+RecordSet QuerySystem::add_RecordSet(RecordSet a, RecordSet b){
+    RecordSet c = a;
+    for(auto record : b.record)
+        c.record.push_back(record);
+    return c;
+}
+
 bool QuerySystem::compare_Value(Value a, Value b, WhereClause::OP_Type op_type){
     if (a.type == Value::Type::NUL && b.type == Value::Type::NUL){ //  两 null 比较
         /* return op_type == WhereClause::OP_Type::EQ;  */ 
@@ -323,6 +330,35 @@ RecordSet QuerySystem::search_by_index(std::string table_name, std::string colum
         }
     }
     return record_set;
+}
+
+//  已有一个表的结果，用其驱动得到两表 join 后根据 where_clause 筛选的结果
+//  其中 where_clause 一定是 another_table.column1 = table_name.column2
+/// 并且保证 table_name 在 column2 上建有索引
+RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::string table_name, WhereClause where_clause){
+    std::map<Value, RecordSet> rs_map;
+    rs_map.clear();
+    for(auto record : input_result.record){
+        auto record_val = get_column_value(input_result.columns, record, where_clause.column);
+        if (rs_map.find(record_val) == rs_map.end()){
+            RecordSet rs;
+            rs.columns = input_result.columns;
+            rs.record.push_back(record);
+            rs_map[record_val] = rs;
+        }
+        else
+            rs_map[record_val].record.push_back(record);
+    }
+    RecordSet result;
+    result.columns = input_result.columns;
+    for(auto ite : rs_map){
+        auto rs = ite.second;
+        int key = ite.first.asInt();
+        auto search_result = search_by_index(table_name, where_clause.expr.column.column_name, key, key);
+        auto join_result = join_Recordset(rs, search_result);
+        result = add_RecordSet(result, join_result);
+    }
+    return result;
 }
 
 RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause where_clause){

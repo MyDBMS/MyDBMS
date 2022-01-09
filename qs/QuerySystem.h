@@ -20,6 +20,8 @@ private:
 
     RecordSet merge_Recordset(RecordSet a, RecordSet b);
 
+    RecordSet add_RecordSet(RecordSet a, RecordSet b);
+
     bool compare_Value(Value a, Value b, WhereClause::OP_Type op_type);
 
     bool is_some_column_exist(RecordSet record_set, Column column);
@@ -33,6 +35,8 @@ private:
     RecordSet search_whole_table(std::string table_name);
 
     RecordSet search_by_index(std::string table_name, std::string column_name, int lower_bound, int upper_bound);
+
+    RecordSet search_by_another_table(RecordSet input_result, std::string table_name, WhereClause where_clause);
 
     RecordSet search_where_clause(RecordSet input_result, WhereClause where_clause);
 
