@@ -12,7 +12,7 @@
 
 class QuerySystem {
 private:
-    bool flag;  //  true 表示正常工作中， false 表示出现了错误
+    void QS_error(const std::string &msg);
 
     std::string from_Value_to_string(Value value);
 
@@ -43,6 +43,8 @@ private:
     RecordSet search_selectors(RecordSet input_result, std::vector<Selector> selectors, GroupBy group_by);
 public:
     ManageSystem &ms;
+
+    bool flag;  //  true 表示正常工作中， false 表示出现了错误
 
     explicit QuerySystem(ManageSystem &ms);
 

@@ -32,6 +32,12 @@ public:
         else assert(false);
     }
 
+    virtual antlrcpp::Any visitStatement(SQLParser::StatementContext *ctx) override {
+        qs.flag = true;  //  语句开始前，将 qs 的 flag 设为 true ，表示还没有错误发生，qs flag 赋值的唯一处
+        auto res = visitChildren(ctx);
+        return res;
+    }
+
     virtual antlrcpp::Any visitCreate_db(SQLParser::Create_dbContext *ctx) override {
         auto res = visitChildren(ctx);
         std::string db_name = ctx->Identifier()->getText();
