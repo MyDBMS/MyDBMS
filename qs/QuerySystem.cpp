@@ -654,16 +654,24 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
                 }
             }
         }
-        //  随便找一个
+        //  找一个行数最少的
         if (!bz){
+            int min_cols = 1000000000;
+            std::string min_table_name;
             for(auto table_name : table_names)
                 if (vec_index[table_name] == -1){
                     bz = true;
-                    vec_index[table_name] = result_vec.size();
-                    result_vec.push_back(search_whole_table(table_name));
-                    break;
+                    int cols = search_whole_table(table_name).record.size();
+                    if (cols < min_cols){
+                        min_cols = cols;
+                        min_table_name = table_name;
+                    }
                 }
             if (!bz) break;
+            else{
+                vec_index[min_table_name] = result_vec.size();
+                result_vec.push_back(search_whole_table(min_table_name));
+            }
         }
     }
     //  将结果列表里的全部卷起来
