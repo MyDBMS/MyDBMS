@@ -8,6 +8,7 @@
 #define MAX_COLUMN_COUNT 16
 #define MAX_COLUMN_NAME_LEN 32
 #define MAX_DEFAULT_STR_LEN 32
+#define MAX_UNIQUE_CONSTRAINT_COUNT 16
 #define MAX_PRIMARY_RESTRICTION_LEN 32
 #define MAX_PRIMARY_FIELD_COUNT 16
 #define MAX_FOREIGN_RESTRICTION_LEN 32
@@ -34,6 +35,10 @@ struct TableMapping {
             float def_float{};
             char def_str[MAX_DEFAULT_STR_LEN + 1]{};
         } fields[MAX_COLUMN_COUNT];
+        std::size_t unique_constraint_count{};
+        struct {
+            u_int16_t column_bitmap{};
+        } unique_constraints[MAX_UNIQUE_CONSTRAINT_COUNT];
         std::size_t primary_field_count{};
         struct {
             char restriction_name[MAX_PRIMARY_RESTRICTION_LEN + 1]{};

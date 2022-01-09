@@ -177,6 +177,21 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
     return true;
 }
 
+bool ManageSystem::add_unique(std::size_t table_loc, const std::vector<std::string> &columns) {
+    auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
+    auto &table_info_field = table_info.unique_constraints[table_info.unique_constraint_count++];
+    table_info_field.column_bitmap = 0;
+    for (const auto &column_name: columns) {
+        auto column_id = find_column_by_name(table_loc, column_name, true);
+        if (column_id == table_info.field_count) {
+            frontend->warning("In unique constraint, column name of " + column_name + " cannot be found.");
+            return false;
+        }
+        table_info_field.column_bitmap |= (1u << column_id);
+    }
+    return true;
+}
+
 ManageSystem ManageSystem::load_system(const std::string &root_dir, const Frontend *frontend) {
     ManageSystem ms(root_dir, frontend);
 
@@ -434,7 +449,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
         strcpy(table_info_field.column_name, f.name.substr(0, MAX_COLUMN_NAME_LEN).c_str());
         table_info_field.nullable = f.nullable;
-        table_info_field.unique = false;
         table_info_field.indexed = false;
         table_info_field.has_def = f.has_def;
 
@@ -584,11 +598,19 @@ void ManageSystem::describe_table(const std::string &table_name) {
         foreign_msg += ");";
         frontend->write_line(foreign_msg);
     }
-    for (std::size_t i = 0; i < info.field_count; ++i) {
-        auto &f = info.fields[i];
-        if (f.unique) {
-            frontend->write_line(std::string("UNIQUE (") + f.column_name + ");");
+    for (std::size_t i = 0; i < info.unique_constraint_count; ++i) {
+        auto &f = info.unique_constraints[i];
+        std::string unique_msg = "UNIQUE ";
+        bool l_par_printed = false;
+        for (int c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                unique_msg += (l_par_printed ? ", " : "(");
+                unique_msg += info.fields[c].column_name;
+                l_par_printed = true;
+            }
         }
+        unique_msg += ");";
+        frontend->write_line(unique_msg);
     }
     for (std::size_t i = 0; i < info.field_count; ++i) {
         auto &f = info.fields[i];
@@ -777,18 +799,9 @@ void ManageSystem::add_unique(const std::string &table_name, const std::vector<s
         frontend->error("Table does not exist.");
         return;
     }
-    if (column_list.size() != 1) {
-        frontend->error("Only single-column unique constraint is supported.");
-        return;
-    }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     std::size_t column_id = find_column_by_name(table_loc, column_list[0]);
     auto &field = info.fields[column_id];
-    if (field.unique) {
-        frontend->error("Column " + column_list[0] + " is already unique!");
-        return;
-    }
-    field.unique = true;
     update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
@@ -824,26 +837,34 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
     }
 
     // Unique restriction
-    for (std::size_t i = 0; i < info.field_count; ++i) {
-        if (info.fields[i].unique && !values[i].isNull()) {
-            WhereClause clause;
-            Column column;
-            Expr expr;
-            column.table_name = table_name;
-            column.column_name = info.fields[i].column_name;
-            clause.type = WhereClause::OP_EXPR;
-            clause.column = column;
-            clause.op_type = WhereClause::EQ;
-            expr.type = Expr::VALUE;
-            expr.value = values[i];
-            expr.column = column;
-            clause.expr = expr;
-            SelectStmt stmt;
-            stmt.table_names.push_back(table_name);
-            stmt.where_clauses.push_back(clause);
-            if (!qs->search(stmt).record.empty()) {
-                return UNIQUE_RESTRICTION_FAIL;
+    for (std::size_t i = 0; i < info.unique_constraint_count; ++i) {
+        auto &f = info.unique_constraints[i];
+        bool has_null = false;
+        SelectStmt stmt;
+        stmt.table_names.push_back(table_name);
+        for (std::size_t c = 0; c < info.field_count; ++c) {
+            if ((f.column_bitmap >> c) & 1) {
+                if (values[c].isNull()) {
+                    has_null = true;
+                    break;
+                }
+                WhereClause clause;
+                Column column;
+                Expr expr;
+                column.table_name = table_name;
+                column.column_name = info.fields[c].column_name;
+                clause.type = WhereClause::OP_EXPR;
+                clause.column = column;
+                clause.op_type = WhereClause::EQ;
+                expr.type = Expr::VALUE;
+                expr.value = values[c];
+                expr.column = column;
+                clause.expr = expr;
+                stmt.where_clauses.push_back(clause);
             }
+        }
+        if (!has_null && !qs->search(stmt).record.empty()) {
+            return UNIQUE_RESTRICTION_FAIL;
         }
     }
 

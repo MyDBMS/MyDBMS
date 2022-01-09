@@ -89,6 +89,8 @@ class ManageSystem {
 
     bool add_foreign_key(std::size_t table_loc, const ForeignField &f);
 
+    bool add_unique(std::size_t table_loc, const std::vector<std::string> &columns);
+
 public:
 
     const Frontend *frontend;
