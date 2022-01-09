@@ -860,7 +860,7 @@ void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignF
     for (const auto &r: qs->search(search_stmt).record) {
         SelectStmt stmt;
         bool has_null = false;
-        stmt.table_names.push_back(table_name);
+        stmt.table_names.push_back(foreign_restriction.foreign_table_name);
         for (int i = 0; i < foreign_restriction.columns.size(); ++i) {
             const auto &column_name = foreign_restriction.columns[i];
             auto column_id = find_column_by_name(table_loc, column_name, true);
