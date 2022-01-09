@@ -276,6 +276,8 @@ INDEX (y);
 +-------+------+------+---------+
 2 rows in set
 FOREIGN KEY f(p, q) REFERENCES test_primary(y, x);
+INDEX (p);
+INDEX (q);
 )");
 
     ts.expect(R"(INSERT INTO test_foreign VALUES (3, 2);)", "");
