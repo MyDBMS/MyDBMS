@@ -10,6 +10,7 @@ bool IndexScan::get_next_entry(RID &rid){
     int key = ((u_int32_t *) page->data)[(INDEX_PAGE_HEADER_SIZE + now_iid.key_id * 8) >> 2];
     if (key > upper_bound) return false;
     memcpy(&rid, page->data + INDEX_PAGE_HEADER_SIZE + now_iid.key_id * 8 + 4, 4);
+    /* printf("IID is { %d , %d }\n", now_iid.page_id, now_iid.key_id); */
     RID_iid = now_iid;  //  rid 对应的 iid
     now_iid.key_id = page->data[PAGE_SIZE - now_iid.key_id * 2 - 2 + 1];
     if (now_iid.key_id == 0){
@@ -90,6 +91,7 @@ IID IndexFile::location_at(int key){
         /* printf("location at, now_page_id is %d\n", now_page_id); */
         auto page = file->get_page(now_page_id);
         auto header = (IndexPageHeader *) page->data;
+        /* printf("location at, now page's key num is %d\n", header->key_num); */
         if (header->is_leaf){  //  直接开始遍历key对应的位置
             u_int8_t now_key_id = header->first_key_id;  //  从开头开始
             /* printf("location at, now_key_id is %d\n", now_key_id); */
@@ -101,10 +103,12 @@ IID IndexFile::location_at(int key){
         }
         else {  //  开始遍历应该往哪个儿子走
             u_int8_t now_key_id = header->first_key_id;  //  从开头开始
-            /* printf("location at, now_key_id is %d\n", now_key_id); */
+            /* printf("location at, now_key_id is %d\n", now_key_id);
+            printf("location at, get key %d\n", get_key(page, now_key_id)); */
             while (get_key(page, now_key_id) < key){
                 now_key_id = get_suc_key_id(page, now_key_id);
-                /* printf("location at, now_key_id is %d\n", now_key_id); */
+                /* printf("location at, now_key_id is %d\n", now_key_id);
+                printf("location at, get key %d\n", get_key(page, now_key_id)); */
             }
             now_page_id = get_value(page, now_key_id);
         }
@@ -234,10 +238,20 @@ std::size_t IndexFile::overflow(std::size_t page_id, std::size_t &new_page_id, u
             //  插入新页
             if (now_key_id != 0){
                 insert_key(new_page_id, 0, now_key, now_value);
+                //  更新其的父亲
+                auto child_page = file->get_page(now_value);
+                auto child_header = (IndexPageHeader *) child_page->data;
+                child_header->parent = new_page_id;
+                child_page->dirty = true;
             }
             else{
                 auto new_page = file->get_page(new_page_id);
                 set_value(new_page, 0, now_value);
+                //  更新其的父亲
+                auto child_page = file->get_page(now_value);
+                auto child_header = (IndexPageHeader *) child_page->data;
+                child_header->parent = new_page_id;
+                child_page->dirty = true;
                 break;
             }
         }
@@ -276,6 +290,7 @@ std::size_t IndexFile::overflow(std::size_t page_id, std::size_t &new_page_id, u
     auto meta_data = (IndexFileMeta *) meta_page->data;
     meta_data->node_num -= 1;
     meta.node_num -= 1;
+    meta_page->dirty = true;
 
     header = (IndexPageHeader *) page->data;
     //  如果从叶子节点分裂成两个叶子，再维护下页头里的叶子链表
@@ -283,6 +298,12 @@ std::size_t IndexFile::overflow(std::size_t page_id, std::size_t &new_page_id, u
         auto new_page = file->get_page(new_page_id);
         auto new_header = (IndexPageHeader *) new_page->data;
         new_header->suc_leaf = header->suc_leaf;
+        if (header->suc_leaf != 0){
+            auto suc_leaf_page = file->get_page(header->suc_leaf);
+            auto suc_header = (IndexPageHeader *) suc_leaf_page->data;
+            suc_header->pre_leaf = new_page_id;
+            suc_leaf_page->dirty = true;
+        }
         new_header->pre_leaf = page_id;
         header->suc_leaf = new_page_id;
         page->dirty = true;
@@ -424,14 +445,30 @@ bool IndexFile::underflow(std::size_t page_id, u_int8_t key_id, u_int8_t &under_
             else{  //  合并
                 auto max_value = get_value(page, 0);
                 insert_key(page_id, 0, x, max_value);
+                //  更新 max_value 的父亲
+                auto max_value_page = file->get_page(max_value);
+                auto max_value_header = (IndexPageHeader *) max_value_page->data;
+                max_value_header->parent = page_id;
+                max_value_page->dirty = true;
                 auto bro_key_id = bro_header->first_key_id;
                 while (bro_key_id != 0){
                     auto bro_key = get_key(bro_page, bro_key_id);
                     auto bro_value = get_value(bro_page, bro_key_id);
                     insert_key(page_id, 0, bro_key, bro_value);
+                    //  更新 bro_value 的父亲
+                    auto bro_value_page = file->get_page(bro_value);
+                    auto bro_value_header = (IndexPageHeader *) bro_value_page->data;
+                    bro_value_header->parent = page_id;
+                    bro_value_page->dirty = true;
                     bro_key_id = get_suc_key_id(bro_page, bro_key_id);
                 }
                 set_value(page, 0, get_value(bro_page, 0));
+                //  更新 val 的父亲
+                auto val = get_value(bro_page, 0);
+                auto val_page = file->get_page(val);
+                auto val_header = (IndexPageHeader *) val_page->data;
+                val_header->parent = page_id;
+                val_page->dirty = true;
                 set_value(parent_page, get_suc_key_id(parent_page, parent_key_id), page_id);
                 return true;  //  需要删掉 parent_key_id
             }
@@ -467,14 +504,30 @@ bool IndexFile::underflow(std::size_t page_id, u_int8_t key_id, u_int8_t &under_
                 //  执行右兄弟合并
                 auto max_value = get_value(page, 0);
                 insert_key(page_id, 0, x, max_value);
+                //  更新 max_value 的父亲
+                auto max_value_page = file->get_page(max_value);
+                auto max_value_header = (IndexPageHeader *) max_value_page->data;
+                max_value_header->parent = page_id;
+                max_value_page->dirty = true;
                 auto bro_key_id = bro_header->first_key_id;
                 while (bro_key_id != 0){
                     auto bro_key = get_key(bro_page, bro_key_id);
                     auto bro_value = get_value(bro_page, bro_key_id);
+                    //  更新 bro_value 的父亲
+                    auto bro_value_page = file->get_page(bro_value);
+                    auto bro_value_header = (IndexPageHeader *) bro_value_page->data;
+                    bro_value_header->parent = page_id;
+                    bro_value_page->dirty = true;
                     insert_key(page_id, 0, bro_key, bro_value);
                     bro_key_id = get_suc_key_id(bro_page, bro_key_id);
                 }
                 set_value(page, 0, get_value(bro_page, 0));
+                //  更新 val 的父亲
+                auto val = get_value(bro_page, 0);
+                auto val_page = file->get_page(val);
+                auto val_header = (IndexPageHeader *) val_page->data;
+                val_header->parent = page_id;
+                val_page->dirty = true;
                 set_value(parent_page, get_suc_key_id(parent_page, parent_key_id), page_id);
                 return true;  //  需要删掉 parent_key_id
             }
@@ -702,6 +755,30 @@ void IndexFile::delete_record_range(int lower_bound, int upper_bound){
 void IndexFile::update_record(int old_key, const RID &old_rid, int new_key, const RID &new_rid){
     delete_record(old_key, old_rid);
     insert_record(new_key, new_rid);
+}
+
+void IndexFile::print_tree_dfs(std::size_t page_id){
+    auto page = file->get_page(page_id);
+    auto header = (IndexPageHeader *) page->data;
+    bool is_leaf = header->is_leaf;
+    printf("now dfs %d\n", page_id);
+    if (is_leaf) printf("It's a leaf\n");
+    auto key_id = header->first_key_id;
+    while (true){
+        printf("IID: %d %d\n", page_id, key_id);
+        printf("(key, value) is (%d, %d)\n", get_key(page, key_id), get_value(page, key_id));
+        if (!is_leaf)
+            print_tree_dfs(get_value(page, key_id));
+        if (key_id == 0) break;
+        key_id = get_suc_key_id(page, key_id);
+    }
+}
+
+void IndexFile::print_tree(){
+    auto meta_page = file->get_page(0);
+    auto meta_data = (IndexFileMeta *) meta_page->data;
+    std::size_t root_page_id = meta_data->root_page;
+    print_tree_dfs(root_page_id);
 }
 
 void IndexFile::close() {

@@ -89,6 +89,8 @@ class IndexFile {
     
     bool delete_key_leaf(std::size_t page_id, std::size_t key_id);
 
+    void print_tree_dfs(std::size_t page_id);
+
 public:
 
     explicit IndexFile(File *file);
@@ -124,6 +126,8 @@ public:
     void delete_record_range(int lower_bound, int upper_bound);
 
     void update_record(int old_key, const RID &old_rid, int new_key, const RID &new_rid);
+
+     void print_tree();
 
     void close();
 };
