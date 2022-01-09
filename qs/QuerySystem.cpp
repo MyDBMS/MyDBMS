@@ -189,12 +189,39 @@ Frontend::Table QuerySystem::from_RecordSet_to_Table(RecordSet record_set){
 }
 
 void QuerySystem::insert_record(std::string table_name, std::vector<Value> values){
-    if (!ms.is_table_exist(table_name)){
-        ms.frontend->error("table is not exist!");
-        flag = false;
-        return;
+    flag = false;
+    switch (ms.validate_insert_data(table_name, values)) {
+        case Error::NONE:
+            flag = true;
+            break;
+        case Error::VALUE_COUNT_MISMATCH:
+            ms.frontend->error("Field count mismatch!");
+            return;
+        case Error::TYPE_MISMATCH:
+            ms.frontend->error("Field type mismatch!");
+            return;
+        case Error::STR_TOO_LONG:
+            ms.frontend->error("String value is too long!");
+            return;
+        case Error::FIELD_CANNOT_BE_NULL:
+            ms.frontend->error("Field cannot be null!");
+            return;
+        case Error::UNIQUE_RESTRICTION_FAIL:
+            ms.frontend->error("Unique constraint failed!");
+            return;
+        case Error::PRIMARY_RESTRICTION_FAIL:
+            ms.frontend->error("Primary constraint failed!");
+            return;
+        case Error::INSERT_FOREIGN_RESTRICTION_FAIL:
+            ms.frontend->error("Foreign constraint failed!");
+            return;
+        case Error::TABLE_DOES_NOT_EXIST:
+            ms.frontend->error("Table does not exist!");
+            return;
+        default:
+            ms.frontend->error("Internal warning: insertion failed due to unhandled reason.");
+            return;
     }
-    //  TODO: 调用系统管理模块接口，处理完整性检查
     std::size_t length;
     auto buffer = ms.from_record_to_bytes(table_name, values, length);
     //  插入记录
@@ -697,6 +724,11 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
 void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause> where_clauses){
     //  构造查找语句，查询所有满足删除条件的记录
     SelectStmt select_stmt;
+    if (!ms.is_table_exist(table_name)){
+        ms.frontend->error("Table does not exist!");
+        flag = false;
+        return;
+    }
     select_stmt.table_names.push_back(table_name);
     select_stmt.where_clauses = where_clauses;
     auto result = search(select_stmt);
@@ -705,7 +737,19 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
     for(auto record : result.record){
         RID rid = record.rid;
         auto values = record.values;
-        //  TODO: 判断删除是否合法
+        switch (ms.validate_delete_data(table_name, values)) {
+            case Error::DELETE_NONE:
+                break;
+            case Error::DELETE_TABLE_DOES_NOT_EXIST:
+                ms.frontend->error("Table name not found.");
+                continue;
+            case Error::DELETE_FOREIGN_RESTRICTION_FAIL:
+                ms.frontend->error("Foreign constraint failed.");
+                continue;
+            default:
+                ms.frontend->warning("Internal warning: unhandled invalid deletion.");
+                continue;
+        }
         record_file->delete_record(rid);
         //  枚举所有的索引
         auto indexs = ms.get_index_ids(table_name);

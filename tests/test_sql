@@ -72,4 +72,6 @@ SELECT student.uid, COUNT(student.id), SUM(student.id), AVG(student.id), MAX(stu
 
 SELECT SUM(student.uid) FROM student;
 
+INSERT INTO student VALUES (300, 20, 'andi2');
+
 EXIT;
