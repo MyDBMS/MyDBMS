@@ -799,9 +799,7 @@ void ManageSystem::add_unique(const std::string &table_name, const std::vector<s
         frontend->error("Table does not exist.");
         return;
     }
-    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
-    std::size_t column_id = find_column_by_name(table_loc, column_list[0]);
-    auto &field = info.fields[column_id];
+    add_unique(table_loc, column_list);
     update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }
