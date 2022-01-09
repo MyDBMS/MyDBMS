@@ -221,7 +221,7 @@ INDEX (x);
 
     ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;", "[INFO] Query OK, 0 rows affected.\n");
 
-    ts.expect("ALTER TABLE test_primary ADD CONSTRAINT yx PRIMARY KEY (y, x);", "[INFO] Query OK, 0 rows affected.\n");
+    ts.expect("ALTER TABLE test_primary ADD CONSTRAINT xy PRIMARY KEY (x, y);", "[INFO] Query OK, 0 rows affected.\n");
 
     ts.expect("DESC test_primary;", R"(+-------+------+------+---------+
 | Field | Type | Null | Default |
@@ -230,7 +230,7 @@ INDEX (x);
 | y     | INT  | NO   | NULL    |
 +-------+------+------+---------+
 2 rows in set
-PRIMARY KEY yx(x, y);
+PRIMARY KEY xy(x, y);
 INDEX (x);
 INDEX (y);
 )");
@@ -253,7 +253,19 @@ INDEX (y);
     ts.expect(R"(CREATE TABLE test_foreign (
     p INT,
     q INT,
-    FOREIGN KEY f (p) REFERENCES test_primary (x)
+    FOREIGN KEY f (p) REFERENCES test_primary (z)
+);)", "[ERROR] In foreign restriction, column name of z cannot be found.\n");
+
+    ts.expect(R"(CREATE TABLE test_foreign (
+    p INT,
+    q INT,
+    FOREIGN KEY f (r) REFERENCES test_primary (x)
+);)", "[ERROR] In foreign restriction, column name of r cannot be found.\n");
+
+    ts.expect(R"(CREATE TABLE test_foreign (
+    p INT,
+    q INT,
+    FOREIGN KEY f (p, q) REFERENCES test_primary (y, x)
 );)", "[INFO] Query OK, 0 rows affected.\n");
 
     ts.expect("DESC test_foreign;", R"(+-------+------+------+---------+
@@ -263,14 +275,37 @@ INDEX (y);
 | q     | INT  | YES  | NULL    |
 +-------+------+------+---------+
 2 rows in set
-FOREIGN KEY f(p) REFERENCES test_primary(x);
+FOREIGN KEY f(p, q) REFERENCES test_primary(y, x);
 )");
 
-    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;",
+    ts.expect(R"(INSERT INTO test_foreign VALUES (3, 2);)", "");
+
+    ts.expect(R"(INSERT INTO test_foreign VALUES (4, 2);)", "[ERROR] Foreign constraint failed!\n");
+
+    ts.expect(R"(INSERT INTO test_foreign VALUES (NULL, 0);)", "");
+
+    ts.expect(R"(DELETE FROM test_primary WHERE test_primary.x = 2 AND test_primary.y = 3;)",
+              "[ERROR] Foreign constraint failed.\n");
+
+    ts.expect("ALTER TABLE test_foreign DROP FOREIGN KEY f;", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect(R"(DELETE FROM test_primary WHERE test_primary.x = 2 AND test_primary.y = 3;)", "");
+
+    ts.expect("ALTER TABLE test_foreign ADD CONSTRAINT f FOREIGN KEY (q) REFERENCES test_primary (y);",
+              "[ERROR] Some value cannot be found in the referenced table. Foreign constraint cannot be added.\n");
+
+    ts.expect("ALTER TABLE test_foreign ADD CONSTRAINT f FOREIGN KEY (p) REFERENCES test_primary (x);",
+              "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("INSERT INTO test_foreign VALUES (4, 3);", "[ERROR] Foreign constraint failed!\n");
+
+    // ts.expect("UPDATE test_primary SET y = 0 WHERE test_primary.y = 3;", "");  // TODO: check this!
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY xy;",
               "[ERROR] Primary key constraint is referenced by a foreign constraint of table test_foreign, and thus cannot be dropped.\n");
 
-    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY yx;",
-              "[ERROR] Primary key constraint is referenced by a foreign constraint of table test_foreign, and thus cannot be dropped.\n");
+    ts.expect("DROP TABLE test_primary;",
+              "[ERROR] Table test_primary is referenced by test_foreign through foreign key, and cannot be dropped.\n");
 
     ts.expect("ALTER TABLE test_foreign DROP FOREIGN KEY f;", "[INFO] Query OK, 0 rows affected.\n");
 

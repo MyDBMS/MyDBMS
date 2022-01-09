@@ -28,7 +28,6 @@ struct TableMapping {
             Field::Type type{};
             std::size_t str_len{};
             bool nullable{};
-            bool unique{};
             bool indexed{};
             bool has_def{};
             int def_int{};
@@ -48,11 +47,9 @@ struct TableMapping {
         struct {
             char restriction_name[MAX_FOREIGN_RESTRICTION_LEN + 1]{};
             u_int16_t column_bitmap{};
-            std::size_t foreign_table_id{};
             u_int16_t foreign_column_bitmap{};
+            std::size_t foreign_table_id{};
             std::size_t foreign_column_ids[MAX_COLUMN_COUNT]{};
         } foreign_fields[MAX_FOREIGN_FIELD_COUNT];
-        std::size_t related_table_count{};
-        std::size_t related_table_ids[MAX_TABLE_COUNT]{};
     } mapping[MAX_TABLE_COUNT]{};
 };

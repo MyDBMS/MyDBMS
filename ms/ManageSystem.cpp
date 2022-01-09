@@ -103,15 +103,27 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
     return info.fields[column_id].column_name;
 }
 
-void ManageSystem::add_index(std::size_t table_loc, std::size_t column_id) {
+void ManageSystem::add_index(std::size_t table_loc, std::size_t column_id, bool need_add_data) {
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
     auto index_file_path = current_db.dir;
     index_file_path.append("idx_" + std::to_string(info.id) + "_" + info.fields[column_id].column_name + ".txt");
     is.create_file(index_file_path.c_str());
     info.fields[column_id].indexed = true;
+
+    if (!need_add_data) return;
+
+    std::size_t length_limit = get_record_length_limit(info.name);
+    auto buffer = new char[length_limit + 5];
+    auto record_file = get_record_file(info.name);
+    auto index_file = get_index_file(info.name, info.fields[column_id].column_name);
+    for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
+        std::size_t length = record_file->get_record(rid, buffer);
+        index_file->insert_record(from_bytes_to_record(info.name, buffer, length)[column_id].asInt(), rid);
+    }
+    delete[] buffer;
 }
 
-bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f) {
+bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f, bool need_add_data_to_index) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
     if (table_info.primary_field_count == MAX_PRIMARY_FIELD_COUNT) {
         frontend->error("Too many primary constraints! Aborting.");
@@ -142,7 +154,7 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f)
             continue;
         }
         if (!table_info.fields[column_id].indexed) {
-            add_index(table_loc, column_id);
+            add_index(table_loc, column_id, need_add_data_to_index);
         }
     }
     return true;
@@ -191,18 +203,14 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
             --table_info.foreign_field_count;
             return false;
         }
+        if (!foreign_table.fields[foreign_column_id].indexed) {
+            frontend->error(
+                    "Cannot find index of column " + foreign_column_name + " in table " + f.foreign_table_name + ".");
+            --table_info.foreign_field_count;
+            return false;
+        }
         table_info_field.foreign_column_bitmap |= (1u << foreign_column_id);
         table_info_field.foreign_column_ids[column_id] = foreign_column_id;
-    }
-    bool exist = false;
-    for (std::size_t i = 0; i < foreign_table.related_table_count; ++i) {
-        if (foreign_table.related_table_ids[i] == table_loc) {
-            exist = true;
-            break;
-        }
-    }
-    if (!exist) {
-        foreign_table.related_table_ids[foreign_table.related_table_count++] = table_loc;
     }
     return true;
 }
@@ -494,7 +502,7 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
     table_info.primary_field_count = 0;
     for (const auto &f: primary_field_list) {
-        if (!add_primary_key(table_mapping.count, f)) {
+        if (!add_primary_key(table_mapping.count, f, false)) {
             return;
         }
     }
@@ -505,7 +513,6 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
             return;
         }
     }
-    table_info.related_table_count = 0;
 
     ++table_mapping.count;
     update_table_mapping_file(current_db.id);
@@ -529,6 +536,20 @@ void ManageSystem::drop_table(const std::string &table_name) {
     }
     auto &mapping = table_mapping_map[current_db.id].mapping;
     auto &info = mapping[table_loc];
+
+    // Foreign key restriction
+    for (std::size_t reference_loc = 0; reference_loc < table_mapping_map[current_db.id].count; ++reference_loc) {
+        if (reference_loc == table_loc) continue;
+        auto &related_table_info = table_mapping_map[current_db.id].mapping[reference_loc];
+        for (std::size_t i = 0; i < related_table_info.foreign_field_count; ++i) {
+            auto &f = related_table_info.foreign_fields[i];
+            if (f.foreign_table_id == info.id) {
+                frontend->error("Table " + table_name + " is referenced by " + related_table_info.name +
+                                " through foreign key, and cannot be dropped.");
+                return;
+            }
+        }
+    }
 
     // Remove record file
     std::filesystem::path file_path = current_db.dir;
@@ -686,18 +707,8 @@ void ManageSystem::create_index(const std::string &table_name, const std::vector
         return;
     }
 
-    add_index(table_loc, column_id);
-    std::size_t length_limit = get_record_length_limit(table_name);
-    auto buffer = new char[length_limit + 5];
-    auto record_file = get_record_file(table_name);
-
-    auto index_file = get_index_file(table_name, column_list[0]);
-    for (RID rid = record_file->find_first(); rid.page_id != 0; rid = record_file->find_next(rid)) {
-        std::size_t length = record_file->get_record(rid, buffer);
-        index_file->insert_record(from_bytes_to_record(table_name, buffer, length)[column_id].asInt(), rid);
-    }
+    add_index(table_loc, column_id, true);
     update_table_mapping_file(current_db.id);
-    delete[] buffer;
 
     frontend->ok(0);
 }
@@ -780,7 +791,7 @@ void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryF
         }
     }
 
-    if (add_primary_key(table_loc, primary_restriction)) {
+    if (add_primary_key(table_loc, primary_restriction, true)) {
         update_table_mapping_file(current_db.id);
         frontend->ok(0);
     }
@@ -834,6 +845,59 @@ void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignF
         frontend->error("Table does not exist.");
         return;
     }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+
+    auto foreign_table_loc = find_table_by_name(foreign_restriction.foreign_table_name, true);
+    if (foreign_table_loc == table_mapping_map[current_db.id].count) {
+        frontend->error("In foreign restriction, table name of " + foreign_restriction.foreign_table_name +
+                        " cannot be found.");
+        return;
+    }
+    auto &foreign_info = table_mapping_map[current_db.id].mapping[foreign_table_loc];
+
+    SelectStmt search_stmt;
+    search_stmt.table_names.push_back(table_name);
+    for (const auto &r: qs->search(search_stmt).record) {
+        SelectStmt stmt;
+        bool has_null = false;
+        stmt.table_names.push_back(table_name);
+        for (int i = 0; i < foreign_restriction.columns.size(); ++i) {
+            const auto &column_name = foreign_restriction.columns[i];
+            auto column_id = find_column_by_name(table_loc, column_name, true);
+            if (column_id == info.field_count) {
+                frontend->error("In foreign constraint, column name of " + column_name + " cannot be found.");
+                return;
+            }
+            const auto &foreign_column_name = foreign_restriction.foreign_columns[i];
+            auto foreign_column_id = find_column_by_name(foreign_table_loc, foreign_column_name, true);
+            if (foreign_column_id == foreign_info.field_count) {
+                frontend->error("In foreign constraint, column name of " + foreign_column_name + " cannot be found.");
+                return;
+            }
+            if (r.values[column_id].isNull()) {
+                has_null = true;
+                break;
+            }
+            WhereClause clause;
+            Column column;
+            Expr expr;
+            column.table_name = foreign_info.name;
+            column.column_name = foreign_column_name;
+            clause.type = WhereClause::OP_EXPR;
+            clause.column = column;
+            clause.op_type = WhereClause::EQ;
+            expr.type = Expr::VALUE;
+            expr.value = r.values[column_id];
+            expr.column = column;
+            clause.expr = expr;
+            stmt.where_clauses.push_back(clause);
+        }
+        if (!has_null && qs->search(stmt).record.empty()) {
+            frontend->error("Some value cannot be found in the referenced table. Foreign constraint cannot be added.");
+            return;
+        }
+    }
+
     if (add_foreign_key(table_loc, foreign_restriction)) {
         update_table_mapping_file(current_db.id);
         frontend->ok(0);
@@ -1016,15 +1080,21 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
     for (std::size_t i = 0; i < info.foreign_field_count; ++i) {
         auto &f = info.foreign_fields[i];
         SelectStmt stmt;
+        bool has_null = false;
         std::size_t foreign_table_loc = find_table_by_id(f.foreign_table_id, true);
         if (foreign_table_loc == table_mapping_map[current_db.id].count) {
             frontend->warning("Internal warning: checking foreign constraint with non-existing table.");
+            continue;
         }
         auto &foreign_info = table_mapping_map[current_db.id].mapping[foreign_table_loc];
         stmt.table_names.emplace_back(foreign_info.name);
 
         for (std::size_t c = 0; c < info.field_count; ++c) {
             if ((f.column_bitmap >> c) & 1) {
+                if (values[c].isNull()) {
+                    has_null = true;
+                    break;
+                }
                 WhereClause clause;
                 Column column;
                 Expr expr;
@@ -1041,7 +1111,7 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
             }
         }
 
-        if (qs->search(stmt).record.empty()) {
+        if (!has_null && qs->search(stmt).record.empty()) {
             return INSERT_FOREIGN_RESTRICTION_FAIL;
         }
     }
@@ -1058,16 +1128,21 @@ Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_n
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
 
     // Foreign key restriction
-    for (std::size_t related_table_loc = 0; related_table_loc < table_mapping_map[current_db.id].count; ++related_table_loc) {
-        if (related_table_loc == table_loc) continue;
-        auto &related_table_info = table_mapping_map[current_db.id].mapping[related_table_loc];
+    for (std::size_t reference_loc = 0; reference_loc < table_mapping_map[current_db.id].count; ++reference_loc) {
+        if (reference_loc == table_loc) continue;
+        auto &related_table_info = table_mapping_map[current_db.id].mapping[reference_loc];
         for (std::size_t i = 0; i < related_table_info.foreign_field_count; ++i) {
             auto &f = related_table_info.foreign_fields[i];
             if (f.foreign_table_id != info.id) continue;
             SelectStmt stmt;
+            bool has_null = false;
             stmt.table_names.emplace_back(related_table_info.name);
             for (std::size_t c = 0; c < related_table_info.field_count; ++c) {
                 if ((f.column_bitmap >> c) & 1) {
+                    if (values[c].isNull()) {
+                        has_null = true;
+                        break;
+                    }
                     WhereClause clause;
                     Column column;
                     Expr expr;
@@ -1083,7 +1158,7 @@ Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_n
                     stmt.where_clauses.push_back(clause);
                 }
             }
-            if (!qs->search(stmt).record.empty()) {
+            if (!has_null && !qs->search(stmt).record.empty()) {
                 return DELETE_FOREIGN_RESTRICTION_FAIL;
             }
         }
