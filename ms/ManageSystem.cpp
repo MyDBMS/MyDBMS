@@ -106,7 +106,7 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
 bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
     if (table_info.primary_field_count == MAX_PRIMARY_FIELD_COUNT) {
-        frontend->error("Too much primary constraints! Aborting.");
+        frontend->error("Too many primary constraints! Aborting.");
         return false;
     }
     auto &table_info_field = table_info.primary_fields[table_info.primary_field_count++];
@@ -134,7 +134,7 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
     auto &table_mapping = table_mapping_map[current_db.id];
     auto &table_info = table_mapping.mapping[table_loc];
     if (table_info.foreign_field_count == MAX_FOREIGN_FIELD_COUNT) {
-        frontend->error("Too much foreign constraints! Aborting.");
+        frontend->error("Too many foreign constraints! Aborting.");
         return false;
     }
     auto &table_info_field = table_info.foreign_fields[table_info.foreign_field_count++];
@@ -192,7 +192,7 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
 bool ManageSystem::add_unique(std::size_t table_loc, const std::vector<std::string> &columns) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
     if (table_info.unique_constraint_count == MAX_UNIQUE_CONSTRAINT_COUNT) {
-        frontend->error("Too much unique constraints! Aborting.");
+        frontend->error("Too many unique constraints! Aborting.");
         return false;
     }
     auto &table_info_field = table_info.unique_constraints[table_info.unique_constraint_count++];
@@ -476,12 +476,16 @@ void ManageSystem::create_table(const std::string &table_name, const std::vector
 
     table_info.primary_field_count = 0;
     for (const auto &f: primary_field_list) {
-        add_primary_key(table_mapping.count, f);
+        if (!add_primary_key(table_mapping.count, f)) {
+            return;
+        }
     }
 
     table_info.foreign_field_count = 0;
     for (const auto &f: foreign_field_list) {
-        add_foreign_key(table_mapping.count, f);
+        if (!add_foreign_key(table_mapping.count, f)) {
+            return;
+        }
     }
     table_info.related_table_count = 0;
 
@@ -724,6 +728,43 @@ void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryF
         frontend->error("Table does not exist.");
         return;
     }
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+
+    SelectStmt search_stmt;
+    search_stmt.table_names.push_back(table_name);
+    for (const auto &r: qs->search(search_stmt).record) {
+        SelectStmt stmt;
+        stmt.table_names.push_back(table_name);
+        for (const auto &column_name: primary_restriction.columns) {
+            auto column_id = find_column_by_name(table_loc, column_name, true);
+            if (column_id == info.field_count) {
+                frontend->error("In primary constraint, column name of " + column_name + " cannot be found.");
+                return;
+            }
+            if (r.values[column_id].isNull()) {
+                frontend->error("Column " + column_name + " has null data. Primary key cannot be set.");
+                return;
+            }
+            WhereClause clause;
+            Column column;
+            Expr expr;
+            column.table_name = table_name;
+            column.column_name = column_name;
+            clause.type = WhereClause::OP_EXPR;
+            clause.column = column;
+            clause.op_type = WhereClause::EQ;
+            expr.type = Expr::VALUE;
+            expr.value = r.values[column_id];
+            expr.column = column;
+            clause.expr = expr;
+            stmt.where_clauses.push_back(clause);
+        }
+        if (qs->search(stmt).record.size() > 1) {
+            frontend->error("Duplicate values exist. Primary key cannot be set.");
+            return;
+        }
+    }
+
     if (add_primary_key(table_loc, primary_restriction)) {
         update_table_mapping_file(current_db.id);
         frontend->ok(0);
@@ -740,26 +781,31 @@ void ManageSystem::drop_primary_key(const std::string &table_name, const std::st
         return;
     }
     auto &info = table_mapping_map[current_db.id].mapping[table_loc];
-    if (restriction_name.empty()) {
-        info.primary_field_count = 0;
-    } else {
-        std::size_t restriction_loc = 0;
-        while (restriction_loc < info.primary_field_count) {
-            if (info.primary_fields[restriction_loc].restriction_name == restriction_name) {
-                break;
+
+    if (info.primary_field_count == 0) {
+        frontend->error("No primary constraint exists.");
+        return;
+    }
+
+    if (!restriction_name.empty() && info.primary_fields[0].restriction_name != restriction_name) {
+        frontend->error("Primary key restriction of name " + restriction_name + " does not exist.");
+        return;
+    }
+
+    for (std::size_t i = 0; i < table_mapping_map[current_db.id].count; ++i) {
+        auto &foreign_table = table_mapping_map[current_db.id].mapping[i];
+        for (int c = 0; c < foreign_table.foreign_field_count; ++c) {
+            auto &r = foreign_table.foreign_fields[c];
+            if (r.foreign_table_id == info.id) {
+                frontend->error(
+                        std::string("Primary key constraint is referenced by a foreign constraint of table ") +
+                        foreign_table.name + ", and thus cannot be dropped.");
+                return;
             }
-            ++restriction_loc;
-        }
-        if (restriction_loc == info.primary_field_count) {
-            frontend->error("Primary key restriction of name " + restriction_name + " does not exist.");
-            return;
-        }
-        --info.primary_field_count;
-        while (restriction_loc < info.primary_field_count) {
-            info.primary_fields[restriction_loc] = info.primary_fields[restriction_loc + 1];
-            ++restriction_loc;
         }
     }
+
+    --info.primary_field_count;
     update_table_mapping_file(current_db.id);
     frontend->ok(0);
 }

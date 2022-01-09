@@ -170,11 +170,24 @@ ALTER TABLE test_unique ADD UNIQUE (x, y);)");
 
     ts.expect("UPDATE test_unique SET z = 0 WHERE test_unique.y = 6;", "[ERROR] Unique constraint failed!\n");
 
-    ts.exec(R"(CREATE TABLE test_primary (
+    ts.expect(R"(CREATE TABLE test_primary (
+    x INT,
+    y INT,
+    PRIMARY KEY (x),
+    PRIMARY KEY (y)
+);)", "[ERROR] Too many primary fields!\n");
+
+    ts.expect(R"(CREATE TABLE test_primary (
+    x INT,
+    y INT,
+    PRIMARY KEY (z)
+);)", "[ERROR] In primary restriction, column name of z cannot be found.\n");
+
+    ts.expect(R"(CREATE TABLE test_primary (
     x INT,
     y INT,
     PRIMARY KEY (x)
-);)");
+);)", "[INFO] Query OK, 0 rows affected.\n");
 
     ts.expect("DESC test_primary;", R"(+-------+------+------+---------+
 | Field | Type | Null | Default |
@@ -185,6 +198,82 @@ ALTER TABLE test_unique ADD UNIQUE (x, y);)");
 2 rows in set
 PRIMARY KEY (x);
 )");
+
+    ts.expect("INSERT INTO test_primary VALUES (NULL, 0);", "[ERROR] Field cannot be null!\n");
+
+    ts.expect("INSERT INTO test_primary VALUES (1, NULL);", "");
+
+    ts.expect("INSERT INTO test_primary VALUES (2, 3);", "");
+
+    ts.expect("INSERT INTO test_primary VALUES (1, NULL);", "[ERROR] Primary constraint failed!\n");
+
+    ts.expect("ALTER TABLE test_primary ADD CONSTRAINT xy PRIMARY KEY (x, y);",
+              "[ERROR] Column y has null data. Primary key cannot be set.\n");
+
+    ts.expect("DELETE FROM test_primary WHERE test_primary.y IS NULL;", "");
+
+    ts.expect("ALTER TABLE test_primary ADD CONSTRAINT yx PRIMARY KEY (y, x);",
+              "[ERROR] Too many primary constraints! Aborting.\n");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY xyz;",
+              "[ERROR] Primary key restriction of name xyz does not exist.\n");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("ALTER TABLE test_primary ADD CONSTRAINT yx PRIMARY KEY (y, x);", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("DESC test_primary;", R"(+-------+------+------+---------+
+| Field | Type | Null | Default |
++-------+------+------+---------+
+| x     | INT  | NO   | NULL    |
+| y     | INT  | NO   | NULL    |
++-------+------+------+---------+
+2 rows in set
+PRIMARY KEY yx(x, y);
+)");
+
+    ts.expect("INSERT INTO test_primary VALUES (3, 3);", "");
+
+    ts.expect("INSERT INTO test_primary VALUES (3, NULL);", "[ERROR] Field cannot be null!\n");
+
+    ts.expect("INSERT INTO test_primary VALUES (3, 3);", "[ERROR] Primary constraint failed!\n");
+
+    ts.expect("SELECT * FROM test_primary;", R"(+----------------+----------------+
+| test_primary.x | test_primary.y |
++----------------+----------------+
+| 2              | 3              |
+| 3              | 3              |
++----------------+----------------+
+2 rows in set
+)");
+
+    ts.expect(R"(CREATE TABLE test_foreign (
+    p INT,
+    q INT,
+    FOREIGN KEY f (p) REFERENCES test_primary (x)
+);)", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("DESC test_foreign;", R"(+-------+------+------+---------+
+| Field | Type | Null | Default |
++-------+------+------+---------+
+| p     | INT  | YES  | NULL    |
+| q     | INT  | YES  | NULL    |
++-------+------+------+---------+
+2 rows in set
+FOREIGN KEY f(p) REFERENCES test_primary(x);
+)");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;",
+              "[ERROR] Primary key constraint is referenced by a foreign constraint of table test_foreign, and thus cannot be dropped.\n");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY yx;",
+              "[ERROR] Primary key constraint is referenced by a foreign constraint of table test_foreign, and thus cannot be dropped.\n");
+
+    ts.expect("ALTER TABLE test_foreign DROP FOREIGN KEY f;", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY;", "[ERROR] No primary constraint exists.\n");
 
     std::filesystem::remove_all(SYSTEM_ROOT);
 }
