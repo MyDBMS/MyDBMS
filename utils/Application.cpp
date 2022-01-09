@@ -25,7 +25,10 @@ void Application::run() {
     while (true) {
         std::string stmt = frontend.read_stmt();
         if (stmt == "EXIT;") break;
+        clock_t start = clock();
         parse(stmt);
+        clock_t end = clock();
+        frontend.info("Elapsed " + std::to_string((double) (end - start) / CLOCKS_PER_SEC) + " seconds.");
     }
     frontend.write_line("Bye");
 }
