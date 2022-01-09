@@ -10,7 +10,7 @@ RID RecordFile::alloc_vacancy(std::size_t record_size) {
     assert(record_size < PAGE_SIZE);
     assert(record_size > 0);
     u_char record_size_level =
-            (record_size + (1 << (PAGE_SIZE_IDX - VAC_LEVEL_IDX)) - 1) >> (PAGE_SIZE_IDX - VAC_LEVEL_IDX);
+            (record_size + 2 + (1 << (PAGE_SIZE_IDX - VAC_LEVEL_IDX)) - 1) >> (PAGE_SIZE_IDX - VAC_LEVEL_IDX);
     for (u_char fsp_id = 0; fsp_id < meta.fsp_cnt; ++fsp_id) {
         if (meta.fsp_data[fsp_id] >= record_size_level) {
             // 在 fsp 中找到有足够空闲空间的页
