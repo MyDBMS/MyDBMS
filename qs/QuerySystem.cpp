@@ -1019,6 +1019,7 @@ void QuerySystem::update_record(std::string table_name, std::vector<std::string>
     auto result = search(select_stmt);
     //  删除原先的记录
     delete_record(table_name, where_clauses);
+    return;
     //  加入这些记录更改后
     for(auto record : result.record){
         auto new_record = record;

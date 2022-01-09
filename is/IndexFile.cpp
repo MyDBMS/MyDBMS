@@ -328,15 +328,17 @@ void IndexFile::delete_key(std::size_t page_id, u_int8_t key_id) {
     set_pre_key_id(page, suc_key_id, pre_key_id);
     //  将最大编号的关键码更改编号为 key_id
     auto max_key_id = header->key_num;
-    set_key(page, key_id, get_key(page, max_key_id));
-    set_value(page, key_id, get_value(page, max_key_id));
-    set_pre_key_id(page, key_id, get_pre_key_id(page, max_key_id));
-    set_suc_key_id(page, key_id, get_suc_key_id(page, max_key_id));
-    pre_key_id = get_pre_key_id(page, key_id);
-    suc_key_id = get_suc_key_id(page, key_id);
-    if (pre_key_id != 0) set_suc_key_id(page, pre_key_id, key_id);
-    else header->first_key_id = key_id;  //  更新链表头
-    set_pre_key_id(page, suc_key_id, key_id);
+    if (key_id != max_key_id){
+        set_key(page, key_id, get_key(page, max_key_id));
+        set_value(page, key_id, get_value(page, max_key_id));
+        set_pre_key_id(page, key_id, get_pre_key_id(page, max_key_id));
+        set_suc_key_id(page, key_id, get_suc_key_id(page, max_key_id));
+        pre_key_id = get_pre_key_id(page, key_id);
+        suc_key_id = get_suc_key_id(page, key_id);
+        if (pre_key_id != 0) set_suc_key_id(page, pre_key_id, key_id);
+        else header->first_key_id = key_id;  //  更新链表头
+        set_pre_key_id(page, suc_key_id, key_id);
+    }
     //  更新页头数据
     header->key_num -= 1;
     page->dirty = true;
@@ -734,6 +736,7 @@ void IndexFile::delete_record(int key, const RID &old_rid){
     RID rid;
     while (index_scan.get_next_entry(rid)){
         if (rid.page_id == old_rid.page_id && rid.slot_id == old_rid.slot_id){
+            /* printf("delete record %d %d %d\n", key, rid.page_id, rid.slot_id); */
             delete_key_leaf(index_scan.RID_iid.page_id, index_scan.RID_iid.key_id);
             break;
         }
