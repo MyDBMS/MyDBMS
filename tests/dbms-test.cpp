@@ -99,6 +99,13 @@ CREATE TABLE test_b1 (p INT DEFAULT 42, q FLOAT NOT NULL, r VARCHAR(24));)");
 
     ts.exec("DROP DATABASE TEST_B;");
     ts.expect("SHOW TABLES;", "[ERROR] DB is not opened yet.\n");
+    ts.expect("SHOW DATABASES;", R"(+----------+
+| Database |
++----------+
+| TEST_A   |
++----------+
+1 row in set
+)");
 
     ts.exec("USE TEST_A; DROP TABLE test_a1;");
     ts.expect("SHOW TABLES;", R"(+------------------+
@@ -109,6 +116,8 @@ CREATE TABLE test_b1 (p INT DEFAULT 42, q FLOAT NOT NULL, r VARCHAR(24));)");
 1 row in set
 )");
 
+    ts.expect("SELECT * FROM test_a1;", "[ERROR] table name does not exist\n");
+
     std::filesystem::remove_all(SYSTEM_ROOT);
 }
 
@@ -118,13 +127,56 @@ void test_integrity() {
 
     ts.exec(R"(CREATE DATABASE DBMS_TEST;
 USE DBMS_TEST;
-CREATE TABLE test (
+CREATE TABLE test_unique (
+    x INT,
+    y INT,
+    z INT
+);
+ALTER TABLE test_unique ADD UNIQUE (x, y);)");
+
+    ts.expect("INSERT INTO test_unique VALUES (1, 1, 0);", "");
+
+    ts.expect("INSERT INTO test_unique VALUES (1, 2, NULL);", "");
+
+    ts.expect("INSERT INTO test_unique VALUES (2, 2, NULL);", "");
+
+    ts.expect("INSERT INTO test_unique VALUES (1, 1, 0);", "[ERROR] Unique constraint failed!\n");
+
+    ts.expect("ALTER TABLE test_unique ADD UNIQUE (y);", "[ERROR] Duplicate values exist.\n");
+
+    ts.expect("ALTER TABLE test_unique ADD UNIQUE (z);", "[INFO] Query OK, 0 rows affected.\n");
+
+    ts.expect("INSERT INTO test_unique VALUES (3, 4, NULL);", "");
+
+    ts.expect("INSERT INTO test_unique VALUES (5, 6, 1);", "");
+
+    ts.expect("INSERT INTO test_unique VALUES (7, 8, 0);", "[ERROR] Unique constraint failed!\n");
+
+    ts.expect("SELECT * FROM test_unique;", R"(+---------------+---------------+---------------+
+| test_unique.x | test_unique.y | test_unique.z |
++---------------+---------------+---------------+
+| 1             | 1             | 0             |
+| 1             | 2             | NULL          |
+| 2             | 2             | NULL          |
+| 3             | 4             | NULL          |
+| 5             | 6             | 1             |
++---------------+---------------+---------------+
+5 rows in set
+)");
+
+    ts.expect("DELETE FROM test_unique WHERE test_unique.y = 2;", "");
+
+    ts.expect("UPDATE test_unique SET x = 2 WHERE test_unique.y = 6;", "");
+
+    ts.expect("UPDATE test_unique SET z = 0 WHERE test_unique.y = 6;", "[ERROR] Unique constraint failed!\n");
+
+    ts.exec(R"(CREATE TABLE test_primary (
     x INT,
     y INT,
     PRIMARY KEY (x)
 );)");
 
-    ts.expect("DESC test;", R"(+-------+------+------+---------+
+    ts.expect("DESC test_primary;", R"(+-------+------+------+---------+
 | Field | Type | Null | Default |
 +-------+------+------+---------+
 | x     | INT  | NO   | NULL    |
@@ -133,8 +185,6 @@ CREATE TABLE test (
 2 rows in set
 PRIMARY KEY (x);
 )");
-
-    ts.expect("SELECT * FROM test;", "Empty set\n");
 
     std::filesystem::remove_all(SYSTEM_ROOT);
 }

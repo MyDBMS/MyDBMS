@@ -105,6 +105,10 @@ std::string ManageSystem::find_column_by_id(std::size_t table_loc, std::size_t c
 
 bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
+    if (table_info.primary_field_count == MAX_PRIMARY_FIELD_COUNT) {
+        frontend->error("Too much primary constraints! Aborting.");
+        return false;
+    }
     auto &table_info_field = table_info.primary_fields[table_info.primary_field_count++];
     if (f.name.length() > MAX_PRIMARY_RESTRICTION_LEN) {
         frontend->warning(
@@ -116,7 +120,8 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f)
     for (const auto &column_name: f.columns) {
         auto column_id = find_column_by_name(table_loc, column_name, true);
         if (column_id == table_info.field_count) {
-            frontend->warning("In primary restriction, column name of " + column_name + " cannot be found.");
+            frontend->error("In primary restriction, column name of " + column_name + " cannot be found.");
+            --table_info.primary_field_count;
             return false;
         }
         table_info.fields[column_id].nullable = false;
@@ -128,6 +133,10 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f)
 bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f) {
     auto &table_mapping = table_mapping_map[current_db.id];
     auto &table_info = table_mapping.mapping[table_loc];
+    if (table_info.foreign_field_count == MAX_FOREIGN_FIELD_COUNT) {
+        frontend->error("Too much foreign constraints! Aborting.");
+        return false;
+    }
     auto &table_info_field = table_info.foreign_fields[table_info.foreign_field_count++];
     if (f.name.length() > MAX_FOREIGN_RESTRICTION_LEN) {
         frontend->warning(
@@ -139,14 +148,16 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
     for (const auto &column_name: f.columns) {
         auto column_id = find_column_by_name(table_loc, column_name, true);
         if (column_id == table_info.field_count) {
-            frontend->warning("In foreign restriction, column name of " + column_name + " cannot be found.");
+            frontend->error("In foreign restriction, column name of " + column_name + " cannot be found.");
+            --table_info.foreign_field_count;
             return false;
         }
         table_info_field.column_bitmap |= (1u << column_id);
     }
     auto foreign_table_loc = find_table_by_name(f.foreign_table_name, true);
     if (foreign_table_loc == table_mapping.count) {
-        frontend->warning("In foreign restriction, table name of " + f.foreign_table_name + " cannot be found.");
+        frontend->error("In foreign restriction, table name of " + f.foreign_table_name + " cannot be found.");
+        --table_info.foreign_field_count;
         return false;
     }
     auto &foreign_table = table_mapping.mapping[foreign_table_loc];
@@ -158,7 +169,8 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
         auto column_id = find_column_by_name(table_loc, column_name, true);
         auto foreign_column_id = find_column_by_name(foreign_table_loc, foreign_column_name, true);
         if (foreign_column_id == table_info.field_count) {
-            frontend->warning("In foreign restriction, column name of " + foreign_column_name + " cannot be found.");
+            frontend->error("In foreign restriction, column name of " + foreign_column_name + " cannot be found.");
+            --table_info.foreign_field_count;
             return false;
         }
         table_info_field.foreign_column_bitmap |= (1u << foreign_column_id);
@@ -179,12 +191,17 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f)
 
 bool ManageSystem::add_unique(std::size_t table_loc, const std::vector<std::string> &columns) {
     auto &table_info = table_mapping_map[current_db.id].mapping[table_loc];
+    if (table_info.unique_constraint_count == MAX_UNIQUE_CONSTRAINT_COUNT) {
+        frontend->error("Too much unique constraints! Aborting.");
+        return false;
+    }
     auto &table_info_field = table_info.unique_constraints[table_info.unique_constraint_count++];
     table_info_field.column_bitmap = 0;
     for (const auto &column_name: columns) {
         auto column_id = find_column_by_name(table_loc, column_name, true);
         if (column_id == table_info.field_count) {
-            frontend->warning("In unique constraint, column name of " + column_name + " cannot be found.");
+            frontend->error("In unique constraint, column name of " + column_name + " cannot be found.");
+            --table_info.unique_constraint_count;
             return false;
         }
         table_info_field.column_bitmap |= (1u << column_id);
@@ -590,7 +607,7 @@ void ManageSystem::describe_table(const std::string &table_name) {
         l_par_printed = false;
         for (int c = 0; c < info.field_count; ++c) {
             if ((f.column_bitmap >> c) & 1) {
-                foreign_msg += (l_par_printed ? ", " : "(");;
+                foreign_msg += (l_par_printed ? ", " : "(");
                 foreign_msg += foreign_table.fields[f.foreign_column_ids[c]].column_name;
                 l_par_printed = true;
             }
@@ -707,9 +724,10 @@ void ManageSystem::add_primary_key(const std::string &table_name, const PrimaryF
         frontend->error("Table does not exist.");
         return;
     }
-    add_primary_key(table_loc, primary_restriction);
-    update_table_mapping_file(current_db.id);
-    frontend->ok(0);
+    if (add_primary_key(table_loc, primary_restriction)) {
+        update_table_mapping_file(current_db.id);
+        frontend->ok(0);
+    }
 }
 
 void ManageSystem::drop_primary_key(const std::string &table_name, const std::string &restriction_name) {
@@ -755,9 +773,10 @@ void ManageSystem::add_foreign_key(const std::string &table_name, const ForeignF
         frontend->error("Table does not exist.");
         return;
     }
-    add_foreign_key(table_loc, foreign_restriction);
-    update_table_mapping_file(current_db.id);
-    frontend->ok(0);
+    if (add_foreign_key(table_loc, foreign_restriction)) {
+        update_table_mapping_file(current_db.id);
+        frontend->ok(0);
+    }
 }
 
 void ManageSystem::drop_foreign_key(const std::string &table_name, const std::string &restriction_name) {
@@ -799,9 +818,48 @@ void ManageSystem::add_unique(const std::string &table_name, const std::vector<s
         frontend->error("Table does not exist.");
         return;
     }
-    add_unique(table_loc, column_list);
-    update_table_mapping_file(current_db.id);
-    frontend->ok(0);
+    auto &info = table_mapping_map[current_db.id].mapping[table_loc];
+
+    SelectStmt search_stmt;
+    search_stmt.table_names.push_back(table_name);
+    for (const auto &r: qs->search(search_stmt).record) {
+        SelectStmt stmt;
+        stmt.table_names.push_back(table_name);
+        bool has_null = false;
+        for (const auto &column_name: column_list) {
+            auto column_id = find_column_by_name(table_loc, column_name, true);
+            if (column_id == info.field_count) {
+                frontend->error("In unique constraint, column name of " + column_name + " cannot be found.");
+                return;
+            }
+            if (r.values[column_id].isNull()) {
+                has_null = true;
+                continue;
+            }
+            WhereClause clause;
+            Column column;
+            Expr expr;
+            column.table_name = table_name;
+            column.column_name = column_name;
+            clause.type = WhereClause::OP_EXPR;
+            clause.column = column;
+            clause.op_type = WhereClause::EQ;
+            expr.type = Expr::VALUE;
+            expr.value = r.values[column_id];
+            expr.column = column;
+            clause.expr = expr;
+            stmt.where_clauses.push_back(clause);
+        }
+        if (!has_null && qs->search(stmt).record.size() > 1) {
+            frontend->error("Duplicate values exist.");
+            return;
+        }
+    }
+
+    if (add_unique(table_loc, column_list)) {
+        update_table_mapping_file(current_db.id);
+        frontend->ok(0);
+    }
 }
 
 Error::InsertError ManageSystem::validate_insert_data(const std::string &table_name, const std::vector<Value> &values) {
