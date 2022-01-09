@@ -8,7 +8,7 @@
 class TestSystem {
     std::stringstream iss, oss;
 
-    StringStreamFrontend frontend{iss, oss};
+    StringStreamFrontend frontend{iss, oss, true};
 
     ManageSystem ms{ManageSystem::load_system(SYSTEM_ROOT, &frontend)};
 
@@ -64,6 +64,8 @@ CREATE TABLE test (
 2 rows in set
 PRIMARY KEY (x);
 )");
+
+    ts.expect("SELECT * FROM test;", "Empty set\n");
 
     std::filesystem::remove_all(SYSTEM_ROOT);
 }

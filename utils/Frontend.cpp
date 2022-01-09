@@ -17,12 +17,21 @@ std::string Frontend::pad(const std::string &s, std::size_t max_width) {
     return " " + s + std::string(max_width - s.length() + 1, ' ');
 }
 
+Frontend::Frontend(bool test_mode) : test_mode(test_mode) {
+}
+
 void Frontend::print_table(const Frontend::Table &table) const {
     // Count width
     std::vector<std::size_t> max_value_width;
     std::vector<std::string> line_segments;
     std::string separator = "+";
     std::size_t row_count = table.empty() ? 0 : table[0].values.size();
+
+    if (row_count == 0) {
+        write_string("Empty set\n");
+        return;
+    }
+
     for (const auto &column: table) {
         std::size_t w = 0;
         if (column.name.length() > w) {
@@ -72,21 +81,21 @@ void Frontend::ok(int row_cnt) const {
 }
 
 void Frontend::info(const std::string &msg) const {
-    write_string("\x1b[34m[INFO] ");
+    write_string(test_mode ? "[INFO] " : "\x1b[34m[INFO] ");
     write_string(msg);
-    write_string("\x1b[0m\n");
+    write_string(test_mode ? "\n" : "\x1b[0m\n");
 }
 
 void Frontend::error(const std::string &msg) const {
-    write_string("\x1b[31m[ERROR] ");
+    write_string(test_mode ? "[ERROR] " : "\x1b[31m[ERROR] ");
     write_string(msg);
-    write_string("\x1b[0m\n");
+    write_string(test_mode ? "\n" : "\x1b[0m\n");
 }
 
 void Frontend::warning(const std::string &msg) const {
-    write_string("\x1b[33m[WARNING] ");
+    write_string(test_mode ? "[WARNING] " : "\x1b[33m[WARNING] ");
     write_string(msg);
-    write_string("\x1b[0m\n");
+    write_string(test_mode ? "\n" : "\x1b[0m\n");
 }
 
 void Frontend::write_line(const std::string &msg) const {
@@ -101,12 +110,15 @@ char StdioFrontend::read_char() {
     return (char) std::cin.get();
 }
 
+StdioFrontend::StdioFrontend() : Frontend(false) {
+};
+
 void StringStreamFrontend::write_string(const std::string &s) const {
     ostream << s;
 }
 
-StringStreamFrontend::StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream)
-        : istream(istream), ostream(ostream) {}
+StringStreamFrontend::StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream, bool test_mode)
+        : Frontend(test_mode), istream(istream), ostream(ostream) {}
 
 char StringStreamFrontend::read_char() {
     return (char) istream.get();

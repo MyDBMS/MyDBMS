@@ -18,6 +18,11 @@ class Frontend {
 
     static std::string pad(const std::string &s, std::size_t max_width);
 
+    bool test_mode;
+
+protected:
+    Frontend(bool test_mode);
+
 public:
     struct Column {
         std::string name;
@@ -43,6 +48,9 @@ class StdioFrontend : public Frontend {
     void write_string(const std::string &s) const override;
 
     char read_char() override;
+
+public:
+    explicit StdioFrontend();
 };
 
 class StringStreamFrontend : public Frontend {
@@ -54,5 +62,5 @@ class StringStreamFrontend : public Frontend {
     char read_char() override;
 
 public:
-    explicit StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream);
+    explicit StringStreamFrontend(std::stringstream &istream, std::stringstream &ostream, bool test_mode = false);
 };
