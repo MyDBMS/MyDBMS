@@ -146,6 +146,8 @@ INSERT INTO test_a3 VALUES (1, 'abcd');
 INSERT INTO test_a3 VALUES (2, 'bcdef');
 INSERT INTO test_a3 VALUES (3, 'cd');)", "");
 
+    ts.expect("INSERT INTO test_a3 VALUES (4, 'long long long');", "[ERROR] String value is too long!\n");
+
     ts.expect("SELECT test_a1.x FROM test_a1 WHERE test_a1.y < 5;", R"(+-----------+
 | test_a1.x |
 +-----------+
@@ -213,6 +215,18 @@ INSERT INTO test_a3 VALUES (3, 'cd');)", "");
 +--------------------+-----------+
 3 rows in set
 )");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x > NULL;", "Empty set\n");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x < NULL;", "Empty set\n");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x >= NULL;", "Empty set\n");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x <= NULL;", "Empty set\n");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x = NULL;", "Empty set\n");
+
+    ts.expect("SELECT * FROM test_a1 WHERE test_a1.x <> NULL;", "Empty set\n");
 
     ts.expect("SELECT * FROM test_a1 WHERE test_a1.y IS NOT NULL;", R"(+-----------+-----------+
 | test_a1.x | test_a1.y |
