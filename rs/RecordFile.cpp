@@ -28,6 +28,11 @@ RID RecordFile::alloc_vacancy(std::size_t record_size) {
             auto header = (RecordPageHeader *) page->data;
             if (fsp->data[cursor] == 0xFF) {
                 // 表示这是一个新页
+                auto meta_page = file->get_page(0);
+                auto meta_data = (RecordFileMeta *) meta_page->data;
+                meta_data->page_cnt = page_id + 1;
+                meta_page->dirty = true;
+                meta.page_cnt = page_id + 1;
                 header->slot_cnt = 1;
                 header->free_size = PAGE_SIZE - RECORD_PAGE_HEADER_SIZE - 2;
                 header->free_offset = RECORD_PAGE_HEADER_SIZE;
