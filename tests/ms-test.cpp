@@ -76,7 +76,7 @@ void test_ms() {
     ms.use_db(DB_NAME);
 
     ms.create_table(FOREIGN_TABLE_NAME, {{"e", Field::INT, 0, false},
-                                         {"f", Field::INT, 0, false}}, {}, {});
+                                         {"f", Field::INT, 0, false}}, {{"", {"f"}}}, {});
     qs.insert_record(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(3)});
 
     std::vector<Field> fields;
@@ -199,17 +199,13 @@ void test_ms() {
 
     // test indexing
     {
-        ms.create_index(TABLE_NAME, {"c"});
-
         auto indices = ms.get_index_ids(TABLE_NAME);
-        assert(indices.size() == 1);
-        assert(indices[0] == 2);
+        assert(indices.size() == 2);
+        assert(indices[0] == 0);
+        assert(indices[1] == 2);
 
-        assert(ms.is_index_exist(TABLE_NAME, "a") == false);
+        assert(ms.is_index_exist(TABLE_NAME, "b") == false);
         assert(ms.is_index_exist(TABLE_NAME, "c") == true);
-
-        auto index_file = ms.get_index_file(TABLE_NAME, "c");
-        index_file->close();
     }
 
     // test altering pk, unique and foreign keys
@@ -218,7 +214,6 @@ void test_ms() {
         ms.add_primary_key(TABLE_NAME, {"test_pk2", {"a"}});
         ms.add_unique(TABLE_NAME, {"c"});
         ms.drop_foreign_key(TABLE_NAME, "foreign");
-        ms.add_foreign_key(TABLE_NAME, {"foreign2", {"c"}, FOREIGN_TABLE_NAME, {"f"}});
     }
 
     // test getting record file
@@ -268,8 +263,8 @@ void test_ms() {
 +-------+------------+------+---------+
 4 rows in set
 PRIMARY KEY test_pk2(a);
-FOREIGN KEY foreign2(c) REFERENCES foreign_tb(f);
 UNIQUE (c);
+INDEX (a);
 INDEX (c);
 )";
         assert(oss.str() == expected);
