@@ -1,6 +1,6 @@
 #include "Application.h"
 
-auto Application::parse(const std::string &sSQL) {
+void Application::parse(const std::string &sSQL) {
     // 解析SQL语句sSQL的过程
     // std::cout << "\n\x1b[34m[INFO] User Input: " << sSQL << "\x1b[0m\n" << std::endl;
     // 转化为输入流
@@ -12,10 +12,13 @@ auto Application::parse(const std::string &sSQL) {
     // 设置Parser
     SQLParser iParser(&sTokenStream);
     auto iTree = iParser.program();
+    if (iParser.getNumberOfSyntaxErrors() > 0) {
+        frontend.error("Syntax error. Please check.");
+        return;
+    }
     // 构造你的visitor
     // visitor模式下执行SQL解析过程
-    auto iRes = iVisitor.visit(iTree);
-    return iRes;
+    iVisitor.visit(iTree);
 }
 
 Application::Application(const std::string &system_root)

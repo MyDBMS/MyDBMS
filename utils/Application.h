@@ -15,7 +15,7 @@ class Application {
 
     MyVisitor iVisitor;
 
-    auto parse(const std::string &sSQL);
+    void parse(const std::string &sSQL);
 
 public:
 
