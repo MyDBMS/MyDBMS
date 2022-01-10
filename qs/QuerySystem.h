@@ -36,7 +36,7 @@ private:
 
     RecordSet search_by_index(std::string table_name, std::string column_name, int lower_bound, int upper_bound);
 
-    RecordSet search_by_another_table(RecordSet input_result, std::string table_name, Column column1, Column column2);
+    RecordSet search_by_another_table(RecordSet input_result, std::string table_name, Column column1, Column column2, bool is_count);
 
     RecordSet search_where_clause(RecordSet input_result, WhereClause where_clause);
 
