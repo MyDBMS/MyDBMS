@@ -76,7 +76,7 @@ std::partial_ordering Value::operator<=>(const Value &rhs) const {
     if (type == NUL && rhs.type == NUL) {
         return std::partial_ordering::equivalent;
     } else if (type != rhs.type) {
-        return std::partial_ordering::unordered;
+        return type <=> rhs.type;
     } else {
         switch (type) {
             case STR:
