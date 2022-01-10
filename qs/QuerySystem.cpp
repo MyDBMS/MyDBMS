@@ -607,7 +607,6 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
                 l_val[column.table_name] = l;
                 r_val[column.table_name] = r;
                 index_column[column.table_name] = column;
-                break;
             }
         }
     }
@@ -657,7 +656,7 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
     std::map<std::string, int> cols_map;
     cols_map.clear();
     for(auto table_name : table_names){
-        cols_map[table_name] = search_whole_table(table_name).record.size();
+        // if (vec_index[table_name] == -1) cols_map[table_name] = search_whole_table(table_name).record.size();
     }
     while (true){
         bool bz = false;
@@ -697,7 +696,10 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
             for(auto table_name : table_names)
                 if (vec_index[table_name] == -1){
                     bz = true;
-                    int cols = search_whole_table(table_name).record.size();
+                    min_table_name = table_name;
+                    break;
+                    /* int cols = search_whole_table(table_name).record.size(); */
+                    int cols = cols_map[table_name];
                     if (cols < min_cols){
                         min_cols = cols;
                         min_table_name = table_name;
