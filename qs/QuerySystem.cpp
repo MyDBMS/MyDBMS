@@ -629,6 +629,11 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
         }
     } */
     //  每次找到可以被驱动的表，否则任找一个
+    std::map<std::string, int> cols_map;
+    cols_map.clear();
+    for(auto table_name : table_names){
+        cols_map[table_name] = search_whole_table(table_name).record.size();
+    }
     while (true){
         bool bz = false;
         //  驱动笛卡尔积
@@ -887,7 +892,7 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         return result;
     }
     else if (selector.type == Selector::Type::CT){
-        RecordSet result;
+        /* RecordSet result;
         Column column;
         column.has_table = false;
         column.column_name = "Count(*)";
@@ -895,6 +900,48 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         RecordData rd;
         rd.values.push_back(Value::make_value(int(input_result.record.size())));
         result.record.push_back(rd);   
+        return result; */
+        RecordSet result;
+        Column column;
+        column.has_table = false;
+        column.column_name = "Count(*)";
+        result.columns.push_back(column);
+        
+        //  处理聚合计算
+        {
+            int cnt_not_null = 0;
+            std::map<Value, Value> calc_map;
+            std::map<Value, int> count_map;
+            std::map<Value, bool> exist_map;
+            calc_map.clear();
+            count_map.clear();
+            exist_map.clear();
+            for(auto record : input_result.record){
+                RecordData rd;
+                Value group_by_val;
+                //  没有 group by 的话，全部聚合到一起
+                if (group_by.is_empty) group_by_val = Value::make_value();
+                else group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                exist_map[group_by_val] = true;
+                if (calc_map.find(group_by_val) == calc_map.end()){  //  创建初值
+                    count_map[group_by_val] = 1;
+                    calc_map[group_by_val] = Value::make_value(1);
+                }
+                else{  //  更新值
+                    auto val = calc_map[group_by_val];
+                    count_map[group_by_val] += 1;
+                    calc_map[group_by_val] = val + Value::make_value(1);
+                }
+            }
+            //  否则，按 group_by_val 的偏序插入 RecordSet
+            for(auto ite : exist_map){
+                RecordData rd;
+                //  处理全 null
+                Value result_val = calc_map[ite.first];
+                rd.values.push_back(result_val);
+                result.record.push_back(rd);
+            }
+        }
         return result;
     }
     else{
@@ -908,13 +955,13 @@ RecordSet QuerySystem::search_selectors(RecordSet input_result, std::vector<Sele
     RecordSet result;  //  空的
     bool is_empty = true;
     for(auto selector : selectors){
-        if (selector.type == Selector::Type::CT){  //  这种情况只应该有一个投影子，返回一列一个数据表示数据量
+        /* if (selector.type == Selector::Type::CT){  //  这种情况只应该有一个投影子，返回一列一个数据表示数据量
             if (selectors.size() > 1){
                 QS_error("Count(*) must be the only selector");
                 return input_result;
             }
             return search_selector(input_result, selector, group_by);  //  唯一，直接返回
-        }
+        } */
         auto output_result = search_selector(input_result, selector, group_by);
         if (is_empty){
             result = output_result;
