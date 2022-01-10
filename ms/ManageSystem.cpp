@@ -1139,7 +1139,8 @@ Error::InsertError ManageSystem::validate_insert_data(const std::string &table_n
     return NONE;
 }
 
-Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_name, const std::vector<Value> &values) {
+Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_name, const std::vector<Value> &values,
+                                                      const std::vector<bool> &mask) {
     using namespace Error;
 
     std::size_t table_loc = find_table_by_name(table_name, true);
@@ -1157,9 +1158,13 @@ Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_n
             if (f.foreign_table_id != info.id) continue;
             SelectStmt stmt;
             bool has_null = false;
+            bool all_unused = true;
             stmt.table_names.emplace_back(related_table_info.name);
             for (std::size_t c = 0; c < related_table_info.field_count; ++c) {
                 if ((f.column_bitmap >> c) & 1) {
+                    if (mask[f.foreign_column_ids[c]]) {
+                        all_unused = false;
+                    }
                     if (values[c].isNull()) {
                         has_null = true;
                         break;
@@ -1179,7 +1184,7 @@ Error::DeleteError ManageSystem::validate_delete_data(const std::string &table_n
                     stmt.where_clauses.push_back(clause);
                 }
             }
-            if (!has_null && !qs->search(stmt).record.empty()) {
+            if (!all_unused && !has_null && !qs->search(stmt).record.empty()) {
                 return DELETE_FOREIGN_RESTRICTION_FAIL;
             }
         }

@@ -139,7 +139,8 @@ public:
 
     Error::InsertError validate_insert_data(const std::string &table_name, const std::vector<Value> &values);
 
-    Error::DeleteError validate_delete_data(const std::string &table_name, const std::vector<Value> &values);
+    Error::DeleteError validate_delete_data(const std::string &table_name, const std::vector<Value> &values,
+                                            const std::vector<bool> &mask);
 
     char *from_record_to_bytes(const std::string &table_name, const std::vector<Value> &values, std::size_t &length);
 
