@@ -355,8 +355,23 @@ RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::stri
         auto rs = ite.second;
         int key = ite.first.asInt();
         auto search_result = search_by_index(table_name, column2.column_name, key, key);
-        auto join_result = join_Recordset(rs, search_result);
-        result = add_RecordSet(join_result, result);
+        /* auto join_result = join_Recordset(rs, search_result);
+        result = add_RecordSet(join_result, result); */
+        if (result.columns.size() == 0){
+            for(auto col : rs.columns)
+                result.columns.push_back(col);
+            for(auto col : search_result.columns)
+                result.columns.push_back(col);
+        }
+        for(auto a_data : rs.record)
+            for(auto b_data : search_result.record){
+                RecordData c_data;
+                for(auto a_value : a_data.values)
+                    c_data.values.push_back(a_value);
+                for(auto b_value : b_data.values)
+                    c_data.values.push_back(b_value);
+                result.record.push_back(c_data);
+            }
     }
     return result;
 }
