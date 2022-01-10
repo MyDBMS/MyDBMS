@@ -284,10 +284,10 @@ RecordSet QuerySystem::search_whole_table(std::string table_name){
     std::size_t max_length = ms.get_record_length_limit(table_name);
     //  找到第一个
     RID rid = record_file->find_first();
+    char buffer[max_length];
     //  遍历
     while (true){
         if (rid.page_id == 0) break;  //  遍历完成
-        char* buffer = new char[max_length];
         std::size_t length = record_file->get_record(rid, buffer);
         auto values = ms.from_bytes_to_record(table_name, buffer, length);
         RecordData rd;
@@ -314,13 +314,13 @@ RecordSet QuerySystem::search_by_index(std::string table_name, std::string colum
         auto index_file = ms.get_index_file(table_name, column_name);
         RID rid;
         IndexScan index_scan;
+        //  从记录系统里查找
+        auto record_file = ms.get_record_file(table_name);
+        // 向管理系统要一下长度上限
+        std::size_t max_length = ms.get_record_length_limit(table_name);
+        char buffer[max_length];
         index_file->search(lower_bound, upper_bound, index_scan);
         while (index_scan.get_next_entry(rid)){
-            //  从记录系统里查找
-            auto record_file = ms.get_record_file(table_name);
-            // 向管理系统要一下长度上限
-            std::size_t max_length = ms.get_record_length_limit(table_name);
-            char* buffer = new char[max_length];
             std::size_t length = record_file->get_record(rid, buffer);
             auto values = ms.from_bytes_to_record(table_name, buffer, length);
             RecordData rd;
