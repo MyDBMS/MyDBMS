@@ -791,6 +791,17 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
         return result;
     }
     else if (selector.type == Selector::Type::AGR_COL){
+        bool is_exist = false;
+        for(auto col : input_result.columns){
+            if (col == selector.col){
+                is_exist = true;
+                break;
+            }
+        }
+        if (!is_exist){
+            QS_error("table.column name does not exist");
+            return input_result;
+        }
         RecordSet result;
         Column column;
         column.has_table = false;
@@ -836,7 +847,19 @@ RecordSet QuerySystem::search_selector(RecordSet input_result, Selector selector
                 Value group_by_val;
                 //  没有 group by 的话，全部聚合到一起
                 if (group_by.is_empty) group_by_val = Value::make_value();
-                else group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                else{
+                    bool is_exist = false;
+                    for(auto column : input_result.columns)
+                        if (column == group_by.column){
+                            is_exist = true;
+                            break;
+                        }
+                    if (!is_exist){
+                        QS_error("group by column isn't exist");
+                        return input_result;
+                    }
+                    group_by_val = get_column_value(input_result.columns, record, group_by.column);
+                }
                 exist_map[group_by_val] = true;
                 Value record_val = get_column_value(input_result.columns, record, selector.col);
                 if (record_val.type == Value::Type::NUL) continue;  //  不对 Null 作聚合
