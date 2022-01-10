@@ -358,12 +358,9 @@ RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::stri
         /* auto join_result = join_Recordset(rs, search_result);
         result = add_RecordSet(join_result, result); */
         if (result.columns.size() == 0){
-            for(auto col : rs.columns)
-                result.columns.push_back(col);
-            for(auto col : search_result.columns)
-                result.columns.push_back(col);
+            result.columns = search_result.columns;
         }
-        for(auto a_data : rs.record)
+        /* for(auto a_data : rs.record)
             for(auto b_data : search_result.record){
                 RecordData c_data;
                 for(auto a_value : a_data.values)
@@ -371,7 +368,10 @@ RecordSet QuerySystem::search_by_another_table(RecordSet input_result, std::stri
                 for(auto b_value : b_data.values)
                     c_data.values.push_back(b_value);
                 result.record.push_back(c_data);
-            }
+            } */
+        for(auto b_data : search_result.record){
+            result.record.push_back(b_data);
+        }
     }
     return result;
 }
@@ -513,7 +513,7 @@ RecordSet QuerySystem::search_where_clause(RecordSet input_result, WhereClause w
     }
 }
 
-RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names, std::vector<WhereClause> where_clauses){
+RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names, std::vector<WhereClause> where_clauses, bool is_count = false){
     //  判断每个表是否都存在
     for(auto table_name : table_names)
         if (!ms.is_table_exist(table_name)){
@@ -667,9 +667,11 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
                 if (ms.is_index_exist(column2.table_name, column2.column_name)){
                     bz = true;
                     int loc = vec_index[column1.table_name];
-                    result_vec[loc] = search_by_another_table(result_vec[loc], column2.table_name, column1, column2);
-                    vec_index[column2.table_name] = loc;
+                    /* result_vec[loc] = search_by_another_table(result_vec[loc], column2.table_name, column1, column2);
+                    vec_index[column2.table_name] = loc;*/
                     where_clauses[i].is_solved = true;
+                    vec_index[column2.table_name] = result_vec.size();
+                    result_vec.push_back(search_by_another_table(result_vec[loc], column2.table_name, column1, column2));
                     break;
                 }
             }
@@ -693,6 +695,25 @@ RecordSet QuerySystem::search_where_clauses(std::vector<std::string> table_names
                 result_vec.push_back(search_whole_table(min_table_name));
             }
         }
+    }
+    bool all_solved = true;
+    for(auto where_clause : where_clauses){
+        if (where_clause.is_solved) continue;
+        all_solved = false;
+    }
+    if (all_solved && is_count){
+        RecordSet result;
+        Column column;
+        column.has_table = false;
+        column.column_name = "COUNT(*)";
+        result.columns.push_back(column);
+        int count = 1;
+        for(auto rt : result_vec)
+            count = count * rt.record.size();
+        RecordData rd;
+        rd.values.push_back(Value::make_value(count));
+        result.record.push_back(rd);
+        return result;
     }
     //  将结果列表里的全部卷起来
     RecordSet init_result;  //  初始没有列，有一条记录（为了 join )
@@ -1020,6 +1041,9 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
             return RecordSet();
         }
         ha_map[table_name] = true;
+    }
+    if (select_stmt.selectors.size() == 1 && select_stmt.selectors[0].type == Selector::Type::CT){  //  特判只有COUNT(*)
+        return search_where_clauses(select_stmt.table_names, select_stmt.where_clauses, true);
     }
     auto where_result = search_where_clauses(select_stmt.table_names, select_stmt.where_clauses);  //  先处理选择子，因为可以用索引加速
     auto selector_result = search_selectors(where_result, select_stmt.selectors, select_stmt.group_by);  //  再处理投影子
