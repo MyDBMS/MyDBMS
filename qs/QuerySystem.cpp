@@ -1065,7 +1065,7 @@ RecordSet QuerySystem::search(SelectStmt select_stmt){
     return result;
 }
 
-void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause> where_clauses){
+void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause> where_clauses, std::vector<bool> v){
     if (!ms.ensure_db_valid()){
         flag = false;
         return;
@@ -1080,7 +1080,7 @@ void QuerySystem::delete_record(std::string table_name, std::vector<WhereClause>
     for(auto record : result.record){
         RID rid = record.rid;
         auto values = record.values;
-        switch (ms.validate_delete_data(table_name, values)) {
+        switch (ms.validate_delete_data(table_name, values, v)) {
             case Error::DELETE_NONE:
                 break;
             case Error::DELETE_TABLE_DOES_NOT_EXIST:
@@ -1126,8 +1126,20 @@ void QuerySystem::update_record(std::string table_name, std::vector<std::string>
     select_stmt.table_names.push_back(table_name);
     select_stmt.where_clauses = where_clauses;
     auto result = search(select_stmt);
+    std::vector<bool> updates;
+    updates.clear();
+    std::map<std::string, bool> cn_map;
+    cn_map.clear();
+    for(auto column_name : column_names)
+        cn_map[column_name] = true;
+    std::vector<bool> v;
+    v.clear();
+    for(int i = 0; i < ms.get_column_num(table_name); i ++)
+        if (cn_map.find(ms.get_column_name(table_name, i)) != cn_map.end())
+            v.push_back(1);
+        else v.push_back(0);
     //  删除原先的记录
-    delete_record(table_name, where_clauses);
+    delete_record(table_name, where_clauses, v);
     //  加入这些记录更改后
     for(auto record : result.record){
         auto new_record = record;

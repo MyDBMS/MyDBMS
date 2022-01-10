@@ -288,7 +288,11 @@ public:
         auto res = visitChildren(ctx);
         std::string table_name = ctx->Identifier()->getText();
         auto where_clauses = ctx->where_and_clause()->where_clauses;
-        qs.delete_record(table_name, where_clauses);
+        std::vector<bool> v;
+        v.clear();
+        for(int i = 0; i < ms.get_column_num(table_name); i ++)
+            v.push_back(1);
+        qs.delete_record(table_name, where_clauses, v);
         return res;
     }
 

@@ -60,7 +60,7 @@ public:
 
     void search_entry(SelectStmt select_stmt);
 
-    void delete_record(std::string table_name, std::vector<WhereClause> where_clauses);
+    void delete_record(std::string table_name, std::vector<WhereClause> where_clauses, std::vector<bool> v);
 
     void update_record(std::string table_name, std::vector<std::string> column_names, std::vector<Value> update_values, std::vector<WhereClause> where_clauses);
 };

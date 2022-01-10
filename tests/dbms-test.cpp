@@ -301,7 +301,7 @@ INDEX (q);
 
     ts.expect("INSERT INTO test_foreign VALUES (4, 3);", "[ERROR] Foreign constraint failed!\n");
 
-    // ts.expect("UPDATE test_primary SET y = 0 WHERE test_primary.y = 3;", "");  // TODO: check this!
+    ts.expect("UPDATE test_primary SET y = 0 WHERE test_primary.y = 3;", "");  // TODO: check this!
 
     ts.expect("ALTER TABLE test_primary DROP PRIMARY KEY xy;",
               "[ERROR] Primary key constraint is referenced by a foreign constraint of table test_foreign, and thus cannot be dropped.\n");
