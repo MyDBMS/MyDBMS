@@ -154,7 +154,7 @@ bool ManageSystem::add_primary_key(std::size_t table_loc, const PrimaryField &f,
             frontend->warning("Internal warning regarding adding primary key.");
             continue;
         }
-        if (!table_info.fields[column_id].indexed) {
+        if (table_info.fields[column_id].type == Field::INT && !table_info.fields[column_id].indexed) {
             add_index(table_loc, column_id, need_add_data_to_index);
         }
     }
@@ -219,7 +219,7 @@ bool ManageSystem::add_foreign_key(std::size_t table_loc, const ForeignField &f,
             frontend->warning("Internal warning regarding adding foreign key.");
             continue;
         }
-        if (!table_info.fields[column_id].indexed) {
+        if (table_info.fields[column_id].type == Field::INT && !table_info.fields[column_id].indexed) {
             add_index(table_loc, column_id, need_add_data_to_index);
         }
     }
@@ -249,7 +249,7 @@ bool ManageSystem::add_unique(std::size_t table_loc, const std::vector<std::stri
             frontend->warning("Internal warning regarding adding unique constraint.");
             continue;
         }
-        if (!table_info.fields[column_id].indexed) {
+        if (table_info.fields[column_id].type == Field::INT && !table_info.fields[column_id].indexed) {
             add_index(table_loc, column_id, true);
         }
     }
