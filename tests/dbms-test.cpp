@@ -169,10 +169,10 @@ INSERT INTO test_a3 VALUES (3, 'cd');)", "");
 )");
 
     ts.expect("SELECT * FROM test_a1, test_a2 WHERE test_a1.x = test_a2.a;", R"(+-----------+-----------+-----------+-----------+
-| test_a2.a | test_a2.b | test_a1.x | test_a1.y |
+| test_a1.x | test_a1.y | test_a2.a | test_a2.b |
 +-----------+-----------+-----------+-----------+
-| 1         | 6         | 1         | NULL      |
-| 3         | 1         | 3         | 4         |
+| 1         | NULL      | 1         | 6         |
+| 3         | 4         | 3         | 1         |
 +-----------+-----------+-----------+-----------+
 2 rows in set
 )");
@@ -266,9 +266,9 @@ INSERT INTO test_a3 VALUES (3, 'cd');)", "");
 
     ts.expect("SELECT * FROM test_a1, test_a2, test_a3 WHERE test_a1.x = test_a2.a AND test_a2.b = test_a3.id;",
               R"(+-----------+-----------+-----------+-----------+------------+-----------+
-| test_a2.a | test_a2.b | test_a1.x | test_a1.y | test_a3.id | test_a3.s |
+| test_a1.x | test_a1.y | test_a2.a | test_a2.b | test_a3.id | test_a3.s |
 +-----------+-----------+-----------+-----------+------------+-----------+
-| 3         | 1         | 3         | 4         | 1          | abcd      |
+| 3         | 4         | 3         | 1         | 1          | abcd      |
 +-----------+-----------+-----------+-----------+------------+-----------+
 1 row in set
 )");

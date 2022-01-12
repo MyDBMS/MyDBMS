@@ -152,9 +152,9 @@ void test_ms() {
                                       Value::make_value("233"),
                                       Value::make_value(6),
                                       Value::make_value(8.0f)});
-        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(4)}) ==
+        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(4)}, {1, 1}) ==
                Error::DELETE_NONE);
-        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(3)}) ==
+        assert(ms.validate_delete_data(FOREIGN_TABLE_NAME, {Value::make_value(2), Value::make_value(3)}, {1, 1}) ==
                Error::DELETE_FOREIGN_RESTRICTION_FAIL);
     }
 
@@ -167,9 +167,9 @@ void test_ms() {
         assert(Value::make_value(80) > Value::make_value(42));
         assert(Value::make_value(12) < Value::make_value(42));
         assert(Value::make_value("xyz") != Value::make_value("abc"));
-        assert(!(Value::make_value() < Value::make_value(42)));
+        assert(!(Value::make_value() > Value::make_value(42)));
         assert(!(Value::make_value(42) == Value::make_value("abc")));
-        assert(!(Value::make_value(42) > Value::make_value("abc")));
+        assert(!(Value::make_value(42) < Value::make_value("abc")));
         assert((Value::make_value(42) != Value::make_value("abc")) == false);
     }
 
