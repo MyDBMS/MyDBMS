@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <cassert>
+#include <compare>
 #include <string>
 
 class Value {
