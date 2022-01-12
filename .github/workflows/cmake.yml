@@ -21,6 +21,16 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
+    - name: Install gcc-11
+      run: |
+        sudo apt-get install -y gcc-11
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 50
+
+    - name: Install g++-11
+      run: |
+        sudo apt-get install -y g++-11
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 50
+
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
