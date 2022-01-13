@@ -1,0 +1,17 @@
+USE DB;
+
+-- Check unique creation
+CREATE TABLE T102 (
+    ID INT,
+    UNI INT,
+    PRIMARY KEY (ID)
+);
+INSERT INTO T102 VALUES (1, 1), (2, 2), (3, 3), (4, 1);
+ALTER TABLE T102 ADD CONSTRAINT UNIQUE (UNI);
+DELETE FROM T102 WHERE T102.ID = 4;
+ALTER TABLE T102 ADD CONSTRAINT UNIQUE (UNI);
+
+-- Check unique insertion
+INSERT INTO T102 VALUES (4,1);
+INSERT INTO T102 VALUES (4,4);
+-- Line 1 fails and line 2 succeeds
