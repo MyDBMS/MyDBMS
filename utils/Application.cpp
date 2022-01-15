@@ -25,6 +25,7 @@ Application::Application(const std::string &system_root)
         : ms{ManageSystem::load_system(system_root, &frontend)}, iVisitor{ms} {}
 
 void Application::run() {
+    frontend.write_line("Welcome to MyDBMS!");
     while (true) {
         std::string stmt = frontend.read_stmt();
         if (stmt == "EXIT;") break;

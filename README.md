@@ -1,5 +1,18 @@
 # MyDBMS
 
+## 运行环境
+
+- C++ 20
+- CMake
+
+## 运行方式
+
+```shell
+cmake .
+make
+./bin/my_dbms
+```
+
 ## 文件管理
 
 `fs` 目录下实现了一个简单的页式文件管理系统。它由三个类（`Filesystem`、`File`、`BufferManager`）和一个结构（`BufferPage`）构成，呈现出如下架构：
